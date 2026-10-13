@@ -15613,11 +15613,18 @@ function ThemeManager:CreateThemeManager(Themesbox: any)
         DoesWrap = true,
     })
 
+    -- Build the list from Roblox's actual Enum so the current/default face is always selectable.
+    local FontFaceValues = {}
+    for _, FontItem in ipairs(Enum.Font:GetEnumItems()) do
+        table.insert(FontFaceValues, FontItem.Name)
+    end
+    table.sort(FontFaceValues)
+
     Themesbox:AddDropdown("FontFace", {
         Text = "Font Face",
-        Default = "Code",
-        
-        Values = { "BuilderSans", "Code", "Fantasy", "Gotham", "Jura", "Roboto", "RobotoMono", "SourceSans" },
+        -- Library.Scheme.Font and the startup theme use Gotham; do not claim the initial face is Code.
+        Default = "Gotham",
+        Values = FontFaceValues,
         AllowNull = false,
         Multi = false
     })
@@ -37218,153 +37225,280 @@ Escape Timer: %*]]
         Greetings:AddDivider()
 
 		local changelogFloat = nil
+		local changelogDragConnection = nil
+
+		local function closeChangelog()
+			if changelogDragConnection then
+				pcall(function() changelogDragConnection:Disconnect() end)
+				changelogDragConnection = nil
+			end
+			if changelogFloat then
+				if lib.DraggableElements then
+					local index = table.find(lib.DraggableElements, changelogFloat)
+					if index then table.remove(lib.DraggableElements, index) end
+				end
+				pcall(function() changelogFloat:Destroy() end)
+				changelogFloat = nil
+			end
+		end
+
 		Greetings:AddButton({
 			Text = "Open Changelog",
 			Func = function()
 				if changelogFloat and changelogFloat.Parent then
-					changelogFloat:Destroy()
-					changelogFloat = nil
+					closeChangelog()
 					return
 				end
 
 				local holder = Instance.new("Frame")
 				holder.Name = "ResonanceChangelog"
-				holder.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+				holder.AnchorPoint = Vector2.new(0.5, 0.5)
+				holder.Position = UDim2.fromScale(0.5, 0.5)
+				holder.Size = UDim2.fromOffset(520, 455)
+				holder.BackgroundColor3 = Color3.fromRGB(13, 17, 27)
 				holder.BorderSizePixel = 0
-				holder.Size = UDim2.fromOffset(420, 500)
-				holder.Position = UDim2.fromOffset(80, 80)
+				holder.ClipsDescendants = true
 				holder.Active = true
+				holder.ZIndex = 300
 				holder.Parent = lib.Floats or lib.ScreenGui
+				changelogFloat = holder
 
-				local corner = Instance.new("UICorner")
-				corner.CornerRadius = UDim.new(0, 6)
-				corner.Parent = holder
+				local holderCorner = Instance.new("UICorner")
+				holderCorner.CornerRadius = UDim.new(0, 18)
+				holderCorner.Parent = holder
 
-				local stroke = Instance.new("UIStroke")
-				stroke.Color = Color3.fromRGB(125, 85, 255)
-				stroke.Thickness = 1.5
-				stroke.Parent = holder
+				local holderStroke = Instance.new("UIStroke")
+				holderStroke.Color = Color3.fromRGB(105, 115, 255)
+				holderStroke.Thickness = 1.5
+				holderStroke.Transparency = 0.18
+				holderStroke.Parent = holder
 
-				local titleBar = Instance.new("TextButton")
-				titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-				titleBar.BorderSizePixel = 0
-				titleBar.Size = UDim2.new(1, 0, 0, 36)
-				titleBar.Text = "  Resonance Custom Changelog"
-				titleBar.TextColor3 = Color3.fromRGB(255, 255, 255)
-				titleBar.TextXAlignment = Enum.TextXAlignment.Left
-				titleBar.Font = Enum.Font.Code
-				titleBar.TextSize = 14
-				titleBar.AutoButtonColor = false
-				titleBar.Parent = holder
+				local holderGradient = Instance.new("UIGradient")
+				holderGradient.Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Color3.fromRGB(19, 25, 42)),
+					ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 14, 23)),
+				})
+				holderGradient.Rotation = 90
+				holderGradient.Parent = holder
 
-				local titleCorner = Instance.new("UICorner")
-				titleCorner.CornerRadius = UDim.new(0, 6)
-				titleCorner.Parent = titleBar
+				local header = Instance.new("Frame")
+				header.Name = "Header"
+				header.Size = UDim2.new(1, 0, 0, 72)
+				header.BackgroundColor3 = Color3.fromRGB(72, 77, 210)
+				header.BorderSizePixel = 0
+				header.Active = true
+				header.ZIndex = 301
+				header.Parent = holder
+				local headerGradient = Instance.new("UIGradient")
+				headerGradient.Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Color3.fromRGB(87, 83, 235)),
+					ColorSequenceKeypoint.new(1, Color3.fromRGB(28, 142, 223)),
+				})
+				headerGradient.Rotation = 0
+				headerGradient.Parent = header
+
+				local brand = Instance.new("TextLabel")
+				brand.Name = "Brand"
+				brand.BackgroundTransparency = 1
+				brand.Position = UDim2.fromOffset(20, 10)
+				brand.Size = UDim2.new(1, -82, 0, 29)
+				brand.Font = Enum.Font.GothamBold
+				brand.Text = "RESONANCE CUSTOM"
+				brand.TextColor3 = Color3.new(1, 1, 1)
+				brand.TextSize = 18
+				brand.TextXAlignment = Enum.TextXAlignment.Left
+				brand.ZIndex = 302
+				brand.Parent = header
+
+				local subtitle = Instance.new("TextLabel")
+				subtitle.Name = "Subtitle"
+				subtitle.BackgroundTransparency = 1
+				subtitle.Position = UDim2.fromOffset(21, 39)
+				subtitle.Size = UDim2.new(1, -82, 0, 18)
+				subtitle.Font = Enum.Font.GothamMedium
+				subtitle.Text = "CHANGELOG  /  VERSION HISTORY"
+				subtitle.TextColor3 = Color3.fromRGB(226, 231, 255)
+				subtitle.TextSize = 10
+				subtitle.TextXAlignment = Enum.TextXAlignment.Left
+				subtitle.ZIndex = 302
+				subtitle.Parent = header
 
 				local closeBtn = Instance.new("TextButton")
-				closeBtn.BackgroundColor3 = Color3.fromRGB(220, 38, 38)
+				closeBtn.Name = "Close"
+				closeBtn.AnchorPoint = Vector2.new(1, 0)
+				closeBtn.Position = UDim2.new(1, -14, 0, 14)
+				closeBtn.Size = UDim2.fromOffset(30, 30)
+				closeBtn.BackgroundColor3 = Color3.fromRGB(17, 23, 42)
+				closeBtn.BackgroundTransparency = 0.2
 				closeBtn.BorderSizePixel = 0
-				closeBtn.Size = UDim2.fromOffset(28, 28)
-				closeBtn.Position = UDim2.new(1, -32, 0, 4)
-				closeBtn.Text = "X"
+				closeBtn.Text = "×"
 				closeBtn.TextColor3 = Color3.new(1, 1, 1)
-				closeBtn.Font = Enum.Font.Code
-				closeBtn.TextSize = 14
-				closeBtn.Parent = titleBar
-
+				closeBtn.Font = Enum.Font.GothamBold
+				closeBtn.TextSize = 20
+				closeBtn.AutoButtonColor = true
+				closeBtn.ZIndex = 303
+				closeBtn.Parent = header
 				local closeCorner = Instance.new("UICorner")
-				closeCorner.CornerRadius = UDim.new(0, 4)
+				closeCorner.CornerRadius = UDim.new(0, 9)
 				closeCorner.Parent = closeBtn
+				closeBtn.MouseButton1Click:Connect(closeChangelog)
 
-				closeBtn.MouseButton1Click:Connect(function()
-					holder:Destroy()
-					changelogFloat = nil
-				end)
+				local accentLine = Instance.new("Frame")
+				accentLine.Name = "AccentLine"
+				accentLine.Position = UDim2.fromOffset(0, 72)
+				accentLine.Size = UDim2.new(1, 0, 0, 2)
+				accentLine.BackgroundColor3 = Color3.fromRGB(111, 187, 255)
+				accentLine.BorderSizePixel = 0
+				accentLine.ZIndex = 302
+				accentLine.Parent = holder
+
+				local scroll = Instance.new("ScrollingFrame")
+				scroll.Name = "Entries"
+				scroll.BackgroundTransparency = 1
+				scroll.BorderSizePixel = 0
+				scroll.Position = UDim2.fromOffset(14, 88)
+				scroll.Size = UDim2.new(1, -28, 1, -130)
+				scroll.ScrollBarThickness = 4
+				scroll.ScrollBarImageColor3 = Color3.fromRGB(112, 149, 255)
+				scroll.CanvasSize = UDim2.fromOffset(0, 0)
+				scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+				scroll.ScrollingDirection = Enum.ScrollingDirection.Y
+				scroll.ZIndex = 301
+				scroll.Parent = holder
+
+				local list = Instance.new("UIListLayout")
+				list.Padding = UDim.new(0, 8)
+				list.SortOrder = Enum.SortOrder.LayoutOrder
+				list.Parent = scroll
+
+				local pad = Instance.new("UIPadding")
+				pad.PaddingLeft = UDim.new(0, 2)
+				pad.PaddingRight = UDim.new(0, 7)
+				pad.PaddingTop = UDim.new(0, 2)
+				pad.PaddingBottom = UDim.new(0, 8)
+				pad.Parent = scroll
+
+				local function addVersionHeader(version, isLatest)
+					local row = Instance.new("Frame")
+					row.Name = "Version_" .. version:gsub("[^%w]", "")
+					row.Size = UDim2.new(1, -4, 0, 36)
+					row.BackgroundColor3 = isLatest and Color3.fromRGB(44, 54, 103) or Color3.fromRGB(29, 34, 49)
+					row.BorderSizePixel = 0
+					row.ZIndex = 302
+					row.Parent = scroll
+					local corner = Instance.new("UICorner")
+					corner.CornerRadius = UDim.new(0, 10)
+					corner.Parent = row
+					local stroke = Instance.new("UIStroke")
+					stroke.Color = isLatest and Color3.fromRGB(119, 142, 255) or Color3.fromRGB(60, 70, 91)
+					stroke.Transparency = isLatest and 0.2 or 0.55
+					stroke.Thickness = 1
+					stroke.Parent = row
+					local label = Instance.new("TextLabel")
+					label.BackgroundTransparency = 1
+					label.Position = UDim2.fromOffset(12, 0)
+					label.Size = UDim2.new(1, -100, 1, 0)
+					label.Font = Enum.Font.GothamBold
+					label.Text = version
+					label.TextColor3 = isLatest and Color3.fromRGB(204, 210, 255) or Color3.fromRGB(205, 212, 226)
+					label.TextSize = 14
+					label.TextXAlignment = Enum.TextXAlignment.Left
+					label.ZIndex = 303
+					label.Parent = row
+					if isLatest then
+						local badge = Instance.new("TextLabel")
+						badge.Name = "LatestBadge"
+						badge.AnchorPoint = Vector2.new(1, 0.5)
+						badge.Position = UDim2.new(1, -10, 0.5, 0)
+						badge.Size = UDim2.fromOffset(64, 20)
+						badge.BackgroundColor3 = Color3.fromRGB(108, 129, 255)
+						badge.BorderSizePixel = 0
+						badge.Font = Enum.Font.GothamBold
+						badge.Text = "LATEST"
+						badge.TextColor3 = Color3.new(1, 1, 1)
+						badge.TextSize = 9
+						badge.ZIndex = 303
+						badge.Parent = row
+						local badgeCorner = Instance.new("UICorner")
+						badgeCorner.CornerRadius = UDim.new(0, 6)
+						badgeCorner.Parent = badge
+					end
+				end
+
+				local function addBullet(text, emphasis)
+					local row = Instance.new("TextLabel")
+					row.Name = "Entry"
+					row.BackgroundColor3 = Color3.fromRGB(26, 31, 44)
+					row.BackgroundTransparency = 0.08
+					row.BorderSizePixel = 0
+					row.Size = UDim2.new(1, -4, 0, 0)
+					row.AutomaticSize = Enum.AutomaticSize.Y
+					row.Font = Enum.Font.Gotham
+					row.Text = text
+					row.TextColor3 = emphasis and Color3.fromRGB(245, 247, 255) or Color3.fromRGB(195, 204, 221)
+					row.TextSize = 13
+					row.TextWrapped = true
+					row.TextXAlignment = Enum.TextXAlignment.Left
+					row.TextYAlignment = Enum.TextYAlignment.Center
+					row.RichText = false
+					row.ZIndex = 302
+					row.Parent = scroll
+					local corner = Instance.new("UICorner")
+					corner.CornerRadius = UDim.new(0, 8)
+					corner.Parent = row
+					local padding = Instance.new("UIPadding")
+					padding.PaddingLeft = UDim.new(0, 12)
+					padding.PaddingRight = UDim.new(0, 12)
+					padding.PaddingTop = UDim.new(0, 9)
+					padding.PaddingBottom = UDim.new(0, 9)
+					padding.Parent = row
+				end
+
+				addVersionHeader("V1.1", true)
+				addBullet("- Way to much", true)
+				addVersionHeader("V1.0.0", false)
+				addBullet("- Custom 3D blackhole models")
+				addBullet("- Blackhole sound / image / tint options")
+				addBullet("- Target Tracer + Preview window")
+				addBullet("- Save / Load / Delete anchored builds")
+				addBullet("- Coconut Forms: 67 bounce + penis bend + Tail/Tentacles")
+				addBullet("- Soft-body jiggle (boobs / ass / penis)")
+				addBullet("- Toys: Ladder Spider, BombMissile Fly to Target")
+				addBullet("- Watermark styles: Resonance / Wraith")
+				addBullet("- Auto-Clicker: Auto Slider + clearer axis names")
+				addBullet("- Combat: Sex aura")
+
+				local footer = Instance.new("TextLabel")
+				footer.Name = "Footer"
+				footer.BackgroundTransparency = 1
+				footer.Position = UDim2.new(0, 18, 1, -31)
+				footer.Size = UDim2.new(1, -36, 0, 18)
+				footer.Font = Enum.Font.GothamMedium
+				footer.Text = "RESONANCE CUSTOM  •  V1.1"
+				footer.TextColor3 = Color3.fromRGB(112, 128, 161)
+				footer.TextSize = 10
+				footer.TextXAlignment = Enum.TextXAlignment.Left
+				footer.ZIndex = 302
+				footer.Parent = holder
 
 				local dragging, dragStart, startPos
-				titleBar.InputBegan:Connect(function(input)
+				header.InputBegan:Connect(function(input)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 						dragging = true
 						dragStart = input.Position
 						startPos = holder.Position
 						input.Changed:Connect(function()
-							if input.UserInputState == Enum.UserInputState.End then
-								dragging = false
-							end
+							if input.UserInputState == Enum.UserInputState.End then dragging = false end
 						end)
 					end
 				end)
-				UserInputService.InputChanged:Connect(function(input)
+				changelogDragConnection = UserInputService.InputChanged:Connect(function(input)
 					if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 						local delta = input.Position - dragStart
 						holder.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 					end
 				end)
 
-				local scroll = Instance.new("ScrollingFrame")
-				scroll.BackgroundTransparency = 1
-				scroll.BorderSizePixel = 0
-				scroll.Position = UDim2.fromOffset(0, 40)
-				scroll.Size = UDim2.new(1, 0, 1, -44)
-				scroll.ScrollBarThickness = 4
-				scroll.ScrollBarImageColor3 = Color3.fromRGB(125, 85, 255)
-				scroll.CanvasSize = UDim2.fromOffset(0, 0)
-				scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-				scroll.Parent = holder
-
-				local list = Instance.new("UIListLayout")
-				list.Padding = UDim.new(0, 4)
-				list.SortOrder = Enum.SortOrder.LayoutOrder
-				list.Parent = scroll
-
-				local pad = Instance.new("UIPadding")
-				pad.PaddingLeft = UDim.new(0, 10)
-				pad.PaddingRight = UDim.new(0, 10)
-				pad.PaddingTop = UDim.new(0, 6)
-				pad.PaddingBottom = UDim.new(0, 10)
-				pad.Parent = scroll
-
-				local function addLine(text, color, bold)
-					local lbl = Instance.new("TextLabel")
-					lbl.BackgroundTransparency = 1
-					lbl.Size = UDim2.new(1, -8, 0, 0)
-					lbl.AutomaticSize = Enum.AutomaticSize.Y
-					lbl.Text = text
-					lbl.TextColor3 = color or Color3.fromRGB(220, 220, 220)
-					lbl.TextXAlignment = Enum.TextXAlignment.Left
-					lbl.TextWrapped = true
-					lbl.Font = Enum.Font.Code
-					lbl.TextSize = bold and 15 or 13
-					lbl.RichText = true
-					lbl.Parent = scroll
-				end
-
-				-- newest first
-				addLine("<b><font color=\"#fffb00\">V1.1</font></b>", Color3.fromRGB(255, 251, 0), true)
-				addLine("- Home: Open Changelog window")
-				addLine("- Keybinds: Selectable limb removal")
-				addLine("- Keybinds: TP Player to Spawn")
-				addLine("- Keybinds: Fling Player")
-				addLine("- Target: Kick on all axes")
-				addLine("- Misc: Auto Find Cheaters")
-				addLine("- Misc: Cheater scoreboard")
-				addLine("- Toys: Build ghost preview")
-				addLine("- Toys: Share build codes")
-				addLine("- Toys: Coconut Forms on other players")
-				addLine("")
-				addLine("<b><font color=\"#aaaaaa\">V1.0.0</font></b>", Color3.fromRGB(170, 170, 170), true)
-				addLine("- Custom 3D blackhole models")
-				addLine("- Blackhole sound / image / tint options")
-				addLine("- Target Tracer + Preview window")
-				addLine("- Save / Load / Delete anchored builds")
-				addLine("- Coconut Forms: 67 bounce + penis bend + Tail/Tentacles")
-				addLine("- Soft-body jiggle (boobs / ass / penis)")
-				addLine("- Toys: Ladder Spider, BombMissile Fly to Target")
-				addLine("- Watermark styles: Resonance / Wraith")
-				addLine("- Auto-Clicker: Auto Slider + clearer axis names")
-				addLine("- Combat: Sex aura")
-
-				changelogFloat = holder
 				if lib.DraggableElements and not table.find(lib.DraggableElements, holder) then
 					table.insert(lib.DraggableElements, holder)
 				end
@@ -47533,49 +47667,69 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 
 				local frame = Instance.new("Frame")
 				frame.Name = "Keyboard"
-				frame.Size = UDim2.fromOffset(740, 340)
+				frame.Size = UDim2.fromOffset(900, 430)
 				frame.Position = UDim2.fromScale(0.5, 0.5)
 				frame.AnchorPoint = Vector2.new(0.5, 0.5)
-				frame.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
+				frame.BackgroundColor3 = Color3.fromRGB(14, 18, 29)
 				frame.BorderSizePixel = 0
 				frame.Parent = gui
 				local corner = Instance.new("UICorner")
-				corner.CornerRadius = UDim.new(0, 8)
+				corner.CornerRadius = UDim.new(0, 16)
 				corner.Parent = frame
 				local stroke = Instance.new("UIStroke")
-				stroke.Color = Color3.fromRGB(60, 60, 70)
-				stroke.Thickness = 1
+				stroke.Color = Color3.fromRGB(100, 120, 255)
+				stroke.Transparency = 0.18
+				stroke.Thickness = 1.5
 				stroke.Parent = frame
 
 				-- title bar (drag handle)
 				local title = Instance.new("TextButton")
 				title.Name = "Title"
-				title.Size = UDim2.new(1, 0, 0, 32)
-				title.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+				title.Size = UDim2.new(1, 0, 0, 44)
+				title.BackgroundColor3 = Color3.fromRGB(28, 34, 53)
 				title.BorderSizePixel = 0
-				title.Text = "  Keyboard (QWERTY · 75%) — green = free, red = assigned (hover)"
-				title.TextColor3 = Color3.fromRGB(230, 230, 240)
+				title.Text = "  KEYBOARD FREE KEYS  ·  QWERTY / 75%"
+				title.TextColor3 = Color3.fromRGB(246, 248, 255)
 				title.TextXAlignment = Enum.TextXAlignment.Left
-				title.Font = Enum.Font.Code
-				title.TextSize = 13
+				title.Font = Enum.Font.GothamBold
+				title.TextSize = 15
 				title.AutoButtonColor = false
 				title.Parent = frame
 				local titleCorner = Instance.new("UICorner")
-				titleCorner.CornerRadius = UDim.new(0, 8)
+				titleCorner.CornerRadius = UDim.new(0, 16)
 				titleCorner.Parent = title
+				local titleGradient = Instance.new("UIGradient")
+				titleGradient.Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Color3.fromRGB(62, 68, 150)),
+					ColorSequenceKeypoint.new(1, Color3.fromRGB(24, 105, 145)),
+				})
+				titleGradient.Parent = title
+
+				local subline = Instance.new("TextLabel")
+				subline.Name = "Hint"
+				subline.BackgroundTransparency = 1
+				subline.Position = UDim2.fromOffset(15, 51)
+				subline.Size = UDim2.new(1, -30, 0, 22)
+				subline.Font = Enum.Font.GothamMedium
+				subline.Text = "Green keys are free  •  Red keys are assigned  •  Hover an assigned key for details"
+				subline.TextColor3 = Color3.fromRGB(175, 190, 215)
+				subline.TextSize = 11
+				subline.TextXAlignment = Enum.TextXAlignment.Left
+				subline.ZIndex = 2
+				subline.Parent = frame
 
 				local closeBtn = Instance.new("TextButton")
 				closeBtn.Size = UDim2.fromOffset(28, 28)
-				closeBtn.Position = UDim2.new(1, -30, 0, 2)
-				closeBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+				closeBtn.Position = UDim2.new(1, -36, 0, 8)
+				closeBtn.BackgroundColor3 = Color3.fromRGB(180, 55, 75)
 				closeBtn.Text = "X"
 				closeBtn.TextColor3 = Color3.new(1, 1, 1)
-				closeBtn.Font = Enum.Font.Code
+				closeBtn.Font = Enum.Font.GothamBold
 				closeBtn.TextSize = 14
 				closeBtn.BorderSizePixel = 0
 				closeBtn.Parent = frame
 				local closeCorner = Instance.new("UICorner")
-				closeCorner.CornerRadius = UDim.new(0, 6)
+				closeCorner.CornerRadius = UDim.new(0, 9)
 				closeCorner.Parent = closeBtn
 				closeBtn.MouseButton1Click:Connect(function()
 					gui:Destroy()
@@ -47596,19 +47750,26 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 						end)
 					end
 				end)
-				UserInputService.InputChanged:Connect(function(input)
+				local keymapDragConnection = UserInputService.InputChanged:Connect(function(input)
 					if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 						local delta = input.Position - dragStart
 						frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 					end
 				end)
+				gui.Destroying:Connect(function()
+					if keymapDragConnection then
+						pcall(function() keymapDragConnection:Disconnect() end)
+						keymapDragConnection = nil
+					end
+					if tbl12._KeyMapGui == gui then tbl12._KeyMapGui = nil end
+				end)
 
 				-- tooltip
 				local tip = Instance.new("TextLabel")
 				tip.Name = "Tooltip"
-				tip.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+				tip.BackgroundColor3 = Color3.fromRGB(23, 29, 45)
 				tip.TextColor3 = Color3.fromRGB(255, 255, 255)
-				tip.Font = Enum.Font.Code
+				tip.Font = Enum.Font.GothamMedium
 				tip.TextSize = 12
 				tip.TextWrapped = true
 				tip.Visible = false
@@ -47619,7 +47780,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				tipCorner.CornerRadius = UDim.new(0, 4)
 				tipCorner.Parent = tip
 				local tipStroke = Instance.new("UIStroke")
-				tipStroke.Color = Color3.fromRGB(80, 80, 90)
+				tipStroke.Color = Color3.fromRGB(108, 130, 255)
 				tipStroke.Parent = tip
 
 				-- 75% form + QWERTY labels
@@ -47632,8 +47793,8 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					{ "CTRL", "WIN", "ALT", "SPACE", "ALT", "CTRL", "LEFT", "DOWN", "UP", "RIGHT" },
 				}
 
-				local keyW, keyH, gap = 46, 34, 4
-				local startY = 42
+				local keyW, keyH, gap = 50, 36, 5
+				local startY = 91
 
 				local function keyWidth(label)
 					if label == "SPACE" then return keyW * 4 + gap * 3 end
@@ -47659,17 +47820,22 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 						local btn = Instance.new("TextButton")
 						btn.Size = UDim2.fromOffset(w, keyH)
 						btn.Position = UDim2.fromOffset(x, y)
-						btn.BackgroundColor3 = isTaken and Color3.fromRGB(160, 45, 45) or Color3.fromRGB(40, 140, 70)
+						btn.BackgroundColor3 = isTaken and Color3.fromRGB(112, 42, 67) or Color3.fromRGB(27, 100, 94)
 						btn.Text = label
 						btn.TextColor3 = Color3.new(1, 1, 1)
-						btn.Font = Enum.Font.Code
+						btn.Font = Enum.Font.GothamBold
 						btn.TextSize = (#label > 3) and 10 or 12
 						btn.BorderSizePixel = 0
 						btn.AutoButtonColor = true
 						btn.Parent = frame
 						local kc = Instance.new("UICorner")
-						kc.CornerRadius = UDim.new(0, 4)
+						kc.CornerRadius = UDim.new(0, 7)
 						kc.Parent = btn
+						local keyStroke = Instance.new("UIStroke")
+						keyStroke.Color = isTaken and Color3.fromRGB(240, 105, 132) or Color3.fromRGB(87, 210, 185)
+						keyStroke.Transparency = 0.3
+						keyStroke.Thickness = 1
+						keyStroke.Parent = btn
 
 						if isTaken then
 							btn.MouseEnter:Connect(function()
@@ -47681,8 +47847,8 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 								tip.Size = UDim2.fromOffset(260, 18 + #assigned * 16)
 								local pos = btn.Position
 								tip.Position = UDim2.fromOffset(
-									math.clamp(pos.X.Offset, 8, 720 - 270),
-									math.max(8, pos.Y.Offset - tip.Size.Y.Offset - 4)
+									math.clamp(pos.X.Offset, 8, 900 - 270),
+									math.max(84, pos.Y.Offset - tip.Size.Y.Offset - 4)
 								)
 								tip.Visible = true
 							end)
@@ -47697,24 +47863,44 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 
 				-- refresh button
 				local refresh = Instance.new("TextButton")
-				refresh.Size = UDim2.fromOffset(70, 22)
-				refresh.Position = UDim2.new(1, -110, 0, 5)
-				refresh.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+				refresh.Size = UDim2.fromOffset(74, 26)
+				refresh.Position = UDim2.new(1, -80, 0, 9)
+				refresh.BackgroundColor3 = Color3.fromRGB(57, 71, 110)
 				refresh.Text = "Refresh"
 				refresh.TextColor3 = Color3.new(1, 1, 1)
-				refresh.Font = Enum.Font.Code
-				refresh.TextSize = 12
+				refresh.Font = Enum.Font.GothamBold
+				refresh.TextSize = 11
 				refresh.BorderSizePixel = 0
 				refresh.Parent = frame
 				local rc = Instance.new("UICorner")
-				rc.CornerRadius = UDim.new(0, 4)
+				rc.CornerRadius = UDim.new(0, 8)
 				rc.Parent = refresh
 				refresh.MouseButton1Click:Connect(function()
-					-- close; click the button again to reopen with fresh assignments
+					-- Close and reopen from Keyboard Free Keys to get a fresh assignment scan.
 					gui:Destroy()
 					tbl12._KeyMapGui = nil
 					fn18("Closed — click Keyboard Free Keys again to refresh", "Key Map", 2)
 				end)
+
+				local totalKeys, assignedKeys = 0, 0
+				for _, row in ipairs(rows) do
+					for _, label in ipairs(row) do
+						totalKeys += 1
+						local values = assignments[label:upper()]
+						if values and #values > 0 then assignedKeys += 1 end
+					end
+				end
+				local summary = Instance.new("TextLabel")
+				summary.Name = "AssignmentSummary"
+				summary.BackgroundTransparency = 1
+				summary.Position = UDim2.new(0, 15, 1, -27)
+				summary.Size = UDim2.new(1, -30, 0, 16)
+				summary.Font = Enum.Font.GothamMedium
+				summary.Text = string.format("%d key positions  •  %d assigned  •  %d free", totalKeys, assignedKeys, totalKeys - assignedKeys)
+				summary.TextColor3 = Color3.fromRGB(120, 145, 177)
+				summary.TextSize = 10
+				summary.TextXAlignment = Enum.TextXAlignment.Left
+				summary.Parent = frame
 			end,
 		})
 	end
@@ -47870,6 +48056,11 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					local gradients = tbl7.Gradients
 
 					while task.wait(0.5) and tbl8.GradientLine and not flag11 do
+						-- Let the Settings black-to-cyan preset take priority without
+						-- killing this loop; the user's configured gradient resumes when it is disabled.
+						if tbl8.ResonanceBlackCyanLine then
+							continue
+						end
 						local updateLineColorsEvent = ReplicatedStorage.DataEvents.UpdateLineColorsEvent
 						local fireServer = updateLineColorsEvent.FireServer
 						local colorSequence = ColorSequence.new
@@ -49151,6 +49342,105 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				if _G._updateTabIndicatorVisibility then task.defer(_G._updateTabIndicatorVisibility) end
 			end,
 		})
+
+		-- Compact preset from the older HuiG script: black fading into cyan-green.
+		-- The existing Gradient Line feature is paused while this preset is on and
+		-- resumes automatically if it had already been enabled.
+		Display:AddDivider("Grab Line")
+		local linePresetRestoreGradient = false
+		local function getLineColorEvent()
+			local dataEvents = ReplicatedStorage:FindFirstChild("DataEvents")
+			local event = dataEvents and dataEvents:FindFirstChild("UpdateLineColorsEvent")
+			if event and event:IsA("RemoteEvent") then return event end
+			return nil
+		end
+
+		local function sendConfiguredLineGradient()
+			local event = getLineColorEvent()
+			if not event then return false end
+			local g = tbl7.Gradients or {}
+			local c1 = g.Color1 or Color3.fromRGB(255, 0, 0)
+			local c2 = g.Color2 or Color3.fromRGB(255, 165, 0)
+			local c3 = g.Color3 or Color3.fromRGB(255, 255, 0)
+			local c4 = g.Color4 or Color3.fromRGB(0, 255, 0)
+			local c5 = g.Color5 or Color3.fromRGB(0, 255, 255)
+			local c6 = g.Color6 or Color3.fromRGB(0, 0, 255)
+			local c7 = g.Color7 or Color3.fromRGB(170, 0, 255)
+			local c8 = g.Color8 or Color3.fromRGB(255, 255, 255)
+			local dot = g.DotColor or Color3.fromRGB(255, 255, 255)
+			local keys = {
+				ColorSequenceKeypoint.new(0, c1),
+				ColorSequenceKeypoint.new(0.125, c2),
+				ColorSequenceKeypoint.new(0.25, c3),
+				ColorSequenceKeypoint.new(0.375, c4),
+				ColorSequenceKeypoint.new(0.5, c5),
+				ColorSequenceKeypoint.new(0.625, c6),
+				ColorSequenceKeypoint.new(0.75, c7),
+				ColorSequenceKeypoint.new(0.875, c8),
+				ColorSequenceKeypoint.new(1, dot),
+			}
+			return pcall(function()
+				event:FireServer(ColorSequence.new(keys), c1, c2, c3, c4, c5, c6, c7, c8, dot)
+			end)
+		end
+
+		local function applyBlackCyanLine()
+			local event = getLineColorEvent()
+			if not event then return false end
+			local sequence = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 195)),
+			})
+			return pcall(function() event:FireServer(sequence) end)
+		end
+
+		local linePresetCharacterConnection = localPlayer.CharacterAdded:Connect(function()
+			task.delay(1, function()
+				if tbl8.ResonanceBlackCyanLine and not flag11 then
+					applyBlackCyanLine()
+				end
+			end)
+		end)
+
+		Display:AddToggle("BlackCyanLineColorT", {
+			Text = "Black-Cyan Grab Line",
+			Default = false,
+			Tooltip = "Applies the black-to-cyan-green grab-line gradient from the older script.",
+			Callback = function(enabled)
+				if enabled then
+					if not getLineColorEvent() then
+						if fn18 then fn18("Grab-line color event is unavailable.", "Line Color") end
+						return
+					end
+					linePresetRestoreGradient = tbl8.GradientLine == true
+					tbl8.ResonanceBlackCyanLine = true
+					applyBlackCyanLine()
+				else
+					tbl8.ResonanceBlackCyanLine = false
+					if linePresetRestoreGradient then
+						sendConfiguredLineGradient()
+					else
+						local event = getLineColorEvent()
+						if event then pcall(function() event:FireServer(ColorSequence.new(Color3.fromRGB(255, 255, 255))) end) end
+					end
+				end
+			end,
+		})
+
+		lib:OnUnload(function()
+			if linePresetCharacterConnection then
+				linePresetCharacterConnection:Disconnect()
+			end
+			if tbl8.ResonanceBlackCyanLine then
+				tbl8.ResonanceBlackCyanLine = false
+				if linePresetRestoreGradient then
+					sendConfiguredLineGradient()
+				else
+					local event = getLineColorEvent()
+					if event then pcall(function() event:FireServer(ColorSequence.new(Color3.fromRGB(255, 255, 255))) end) end
+				end
+			end
+		end)
 	end
 
 	do
@@ -52703,7 +52993,7 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
         }
 
         local LiquidGlassConfig = {
-            GlassTransparency = 0.76,
+            GlassTransparency = 0.90,
             HoverGlowAlpha = 0.85,
             MaxBlurSize = 25,
             BorderTransparency = 0.35,
@@ -52712,7 +53002,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
             GhostVFXAlpha = 0.95,
             GlassColor = Color3.fromRGB(255, 255, 255),
             TargetSize = UDim2.fromScale(0.85, 0.75),
-            LogoId = "rbxassetid://125209698949144",
             Keywords = {
                 "color", "picker", "palette", "slider", "hue", "hex",
                 "rainbow", "rgb", "darkness", "lightness", "hsv",
@@ -52907,6 +53196,33 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
                 return
             end
 
+            -- The toy grid uses its own Frame/ScrollingFrame surface, separate from
+            -- Menu. Roblox rewrites that surface when a toy is spawned, which made
+            -- the inventory panel turn solid white even while Menu stayed glassy.
+            -- Guard each game-owned container as it is styled (including protected
+            -- descendants) so a later reset cannot reintroduce the opaque panel.
+            local isPanelSurface = instance:IsA("Frame") or instance:IsA("ScrollingFrame")
+            if isPanelSurface
+                and not LiquidGlassState.CreatedSet[instance]
+                and not LiquidGlassState.MeltEffects[instance] then
+                local function enforceTransparentPanel()
+                    if not LiquidGlassState.Active or not instance.Parent then return end
+                    if instance.BackgroundTransparency < 1 then
+                        liquidGlassSet(instance, "BackgroundTransparency", 1)
+                    end
+                    if instance.BorderSizePixel ~= 0 then
+                        liquidGlassSet(instance, "BorderSizePixel", 0)
+                    end
+                end
+
+                -- Capture the original values only once so disabling Liquid Glass
+                -- still restores the game's initial appearance.
+                liquidGlassSet(instance, "BackgroundTransparency", 1)
+                liquidGlassSet(instance, "BorderSizePixel", 0)
+                liquidGlassConnect(instance:GetPropertyChangedSignal("BackgroundTransparency"), enforceTransparentPanel)
+                liquidGlassConnect(instance:GetPropertyChangedSignal("BorderSizePixel"), enforceTransparentPanel)
+            end
+
             if liquidGlassProtected(instance) then return end
 
             if instance:IsA("Frame") or instance:IsA("ScrollingFrame") then
@@ -52991,13 +53307,13 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
                 liquidGlassConnect(instance.MouseLeave, function() setHover(false) end)
                 liquidGlassConnect(instance.MouseButton1Down, function()
                     if not LiquidGlassState.Active or not instance.Parent then return end
-                    if instance.Name ~= "RejoinButton" then
+                    if instance.Name ~= "ResoLiquidGlassRejoinButton" then
                         liquidGlassTween(scale, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), { Scale = baseScale * 0.93 })
                     end
                     liquidGlassMelt(instance, LiquidGlassUserInput:GetMouseLocation())
                 end)
                 liquidGlassConnect(instance.MouseButton1Up, function()
-                    if LiquidGlassState.Active and instance.Parent and instance.Name ~= "RejoinButton" then
+                    if LiquidGlassState.Active and instance.Parent and instance.Name ~= "ResoLiquidGlassRejoinButton" then
                         liquidGlassTween(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = baseScale * 1.05 })
                     end
                 end)
@@ -53011,16 +53327,70 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
             liquidGlassTween(blur, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), { Size = targetSize })
         end
 
-        local function liquidGlassCreateLogo(menu)
-            local logo = liquidGlassCreate("ImageLabel", "ResoLiquidGlassLogo", menu)
-            logo.Size = UDim2.fromOffset(105, 105)
-            logo.Position = UDim2.new(1, -55, 0, 10)
-            logo.AnchorPoint = Vector2.new(1, 0)
-            logo.BackgroundTransparency = 1
-            logo.Image = LiquidGlassConfig.LogoId
-            logo.ImageColor3 = Color3.fromRGB(255, 255, 255)
-            logo.ImageTransparency = 0.3
-            logo.ZIndex = 10000
+        local function liquidGlassPlaceClearButton(menu)
+            if not menu or not menu.Parent then return end
+            local clearButton = menu:FindFirstChild("RSC_ClearInv", true)
+            if not clearButton or not clearButton:IsA("TextButton") then return end
+
+            -- A dedicated overlay keeps both buttons aligned even if Menu uses a layout object.
+            local controlBar = menu:FindFirstChild("ResoLiquidGlassControlBar")
+            if not controlBar then
+                controlBar = liquidGlassCreate("Frame", "ResoLiquidGlassControlBar", menu)
+                controlBar.Position = UDim2.fromOffset(20, 20)
+                controlBar.Size = UDim2.fromOffset(272, 40)
+                controlBar.BackgroundTransparency = 1
+                controlBar.BorderSizePixel = 0
+                controlBar.ZIndex = 10000
+            end
+
+            -- Preserve the original ToyDestroy title position so disabling Liquid Glass restores it.
+            liquidGlassRemember(clearButton, "Parent")
+            liquidGlassRemember(clearButton, "Position")
+            liquidGlassRemember(clearButton, "Size")
+            liquidGlassRemember(clearButton, "AnchorPoint")
+            liquidGlassRemember(clearButton, "BackgroundColor3")
+            liquidGlassRemember(clearButton, "BackgroundTransparency")
+            liquidGlassRemember(clearButton, "TextColor3")
+            liquidGlassRemember(clearButton, "TextSize")
+            liquidGlassRemember(clearButton, "Font")
+            liquidGlassRemember(clearButton, "ZIndex")
+            liquidGlassRemember(clearButton, "AutoButtonColor")
+
+            clearButton.Parent = controlBar
+            clearButton.Name = "RSC_ClearInv"
+            clearButton.AnchorPoint = Vector2.zero
+            clearButton.Position = UDim2.fromOffset(132, 0)
+            clearButton.Size = UDim2.fromOffset(120, 40)
+            clearButton.BackgroundColor3 = Color3.new(1, 1, 1)
+            clearButton.BackgroundTransparency = 1
+            clearButton.Text = "CLEAR"
+            clearButton.TextColor3 = Color3.new(1, 1, 1)
+            clearButton.TextSize = 14
+            clearButton.Font = Enum.Font.GothamBold
+            clearButton.AutoButtonColor = false
+            clearButton.ZIndex = 10000
+
+            local corner = clearButton:FindFirstChildOfClass("UICorner")
+            if not corner then
+                corner = liquidGlassCreate("UICorner", "ResoLiquidGlassClearCorner", clearButton)
+            end
+            liquidGlassRemember(corner, "CornerRadius")
+            corner.CornerRadius = UDim.new(0, 12)
+
+            local stroke = clearButton:FindFirstChild("LiquidGlow")
+            if not (stroke and stroke:IsA("UIStroke")) then
+                stroke = liquidGlassCreate("UIStroke", "LiquidGlow", clearButton)
+            end
+            liquidGlassRemember(stroke, "Thickness")
+            liquidGlassRemember(stroke, "Color")
+            liquidGlassRemember(stroke, "Transparency")
+            liquidGlassRemember(stroke, "ApplyStrokeMode")
+            liquidGlassRemember(stroke, "Enabled")
+            stroke.Thickness = 2
+            stroke.Color = Color3.new(1, 1, 1)
+            stroke.Transparency = 0.4
+            stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            stroke.Enabled = true
         end
 
         local function liquidGlassCreateRejoin(menu)
@@ -53161,10 +53531,22 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
             liquidGlassSet(menu, "BackgroundColor3", LiquidGlassConfig.GlassColor)
             liquidGlassSet(menuGui, "DisplayOrder", 10000)
 
+            -- The game can rewrite Menu's surface after spawning a toy; keep it at 90% transparent.
+            local function enforceGlassSurface()
+                if not LiquidGlassState.Active or not menu.Parent then return end
+                if math.abs(menu.BackgroundTransparency - LiquidGlassConfig.GlassTransparency) > 0.001 then
+                    liquidGlassSet(menu, "BackgroundTransparency", LiquidGlassConfig.GlassTransparency)
+                end
+                if menu.BackgroundColor3 ~= LiquidGlassConfig.GlassColor then
+                    liquidGlassSet(menu, "BackgroundColor3", LiquidGlassConfig.GlassColor)
+                end
+            end
+
             -- Style current children before adding our own protected overlay elements.
             for _, descendant in ipairs(menu:GetDescendants()) do
                 liquidGlassStyle(descendant)
             end
+            liquidGlassPlaceClearButton(menu)
 
             -- Apply the glass surface directly to Menu. This avoids a negative-ZIndex
             -- overlay that can cover buttons or fail to render consistently.
@@ -53185,7 +53567,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
             liquidGlassSet(menuStroke, "ApplyStrokeMode", Enum.ApplyStrokeMode.Border)
             liquidGlassSet(menuStroke, "Enabled", true)
 
-            liquidGlassCreateLogo(menu)
             liquidGlassCreateRejoin(menu)
 
             local blur = liquidGlassCreate("BlurEffect", "Reso_LiquidGlass_Blur", Lighting)
@@ -53195,8 +53576,15 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
             liquidGlassConnect(menu.DescendantAdded, function(descendant)
                 if LiquidGlassState.Active then
                     liquidGlassStyle(descendant)
+                    if descendant.Name == "RSC_ClearInv" then
+                        task.defer(function()
+                            if LiquidGlassState.Active then liquidGlassPlaceClearButton(menu) end
+                        end)
+                    end
                 end
             end)
+            liquidGlassConnect(menu:GetPropertyChangedSignal("BackgroundTransparency"), enforceGlassSurface)
+            liquidGlassConnect(menu:GetPropertyChangedSignal("BackgroundColor3"), enforceGlassSurface)
             liquidGlassConnect(menu:GetPropertyChangedSignal("Visible"), function()
                 if LiquidGlassState.Active then
                     liquidGlassSetBlur(menu.Visible)

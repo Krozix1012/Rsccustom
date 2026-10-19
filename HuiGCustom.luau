@@ -17440,6 +17440,8 @@ do
                         rbxGeneral = channels and channels:FindFirstChild("RBXGeneral")
 							v20 = nil
 							v18 = nil
+							akKatanaItem = nil
+							akPencilItem = nil
 							remoteEvent = nil
 							v22 = nil
 							parent = nil
@@ -17690,6 +17692,7 @@ do
 							InputLgDelay = 0.05,
 							GucciType = "CreatureBlobman",
 							AKType = "Shuriken",
+							AKTypes = { Shuriken = true },
 							AntiInputType = "FoodHamburger",
 							FasterEscape = 3,
 							AGType = "Normal",
@@ -34411,9 +34414,42 @@ Escape Timer: %*]]
 				-0.01215329859405756, -0.0062481872737407684, -0.99990671873092651
 			)
 
-			-- Supported Anti-Kick item styles.
-			if tbl9.AKType ~= "Shuriken" and tbl9.AKType ~= "Katana On Back" and tbl9.AKType ~= "Pencil Dih" then
-				tbl9.AKType = "Shuriken"
+			-- Multi-select Anti-Kick styles (any combination).
+			do
+				local function normalizeAkTypes(value)
+					local allowed = { Shuriken = true, ["Katana On Back"] = true, ["Pencil Dih"] = true }
+					local out = {}
+					if type(value) == "table" then
+						for k, v in pairs(value) do
+							if v and allowed[k] then
+								out[k] = true
+							end
+						end
+					elseif type(value) == "string" and allowed[value] then
+						out[value] = true
+					end
+					if not next(out) then
+						out.Shuriken = true
+					end
+					return out
+				end
+				tbl9.AKTypes = normalizeAkTypes(tbl9.AKTypes or tbl9.AKType)
+				-- keep legacy string field as a display hint (first selected)
+				tbl9.AKType = (tbl9.AKTypes.Shuriken and "Shuriken")
+					or (tbl9.AKTypes["Katana On Back"] and "Katana On Back")
+					or (tbl9.AKTypes["Pencil Dih"] and "Pencil Dih")
+					or "Shuriken"
+			end
+			local function akTypeSelected(name)
+				return tbl9.AKTypes and tbl9.AKTypes[name] == true
+			end
+			local function destroyAkItem(itemRef)
+				if itemRef then
+					pcall(function()
+						tbl12.DestroyToy(itemRef)
+					end)
+				end
+				return nil
 			end
 			local akKatanaNextSpawnAttempt = 0
 			local akPencilNextSpawnAttempt = 0
@@ -34466,10 +34502,9 @@ Escape Timer: %*]]
 					end
 
 					if not tbl8.AntiKick then
-						if v18 then
-							tbl12.DestroyToy(v18)
-							v18 = nil
-						end
+						v18 = destroyAkItem(v18)
+						akKatanaItem = destroyAkItem(akKatanaItem)
+						akPencilItem = destroyAkItem(akPencilItem)
 						if akDonut then
 							pcall(function() tbl12.DestroyToy(akDonut) end)
 							akDonut = nil
@@ -34496,7 +34531,9 @@ Escape Timer: %*]]
 							end
 						end
 
-						if tbl9.AKType == "Shuriken" then
+						if not akTypeSelected("Shuriken") then
+							v18 = destroyAkItem(v18)
+						else -- Shuriken
 							local parent2, shurHighlight, highlight2, antiKick, forcefieldChar, transparency, isMeshPart
 
 							if not (v18 and v18.Name == "ShurikenRSC" and v18:FindFirstChild("StickyPart") and v18.StickyPart:FindFirstChild("StickyWeld") and v18.StickyPart.StickyWeld.Part1 == ragdollTouchedHitbox) then
@@ -34901,24 +34938,28 @@ Escape Timer: %*]]
 									end
 								end
 							end
-						elseif tbl9.AKType == "Katana On Back" then
+						end
+
+						if not akTypeSelected("Katana On Back") then
+							akKatanaItem = destroyAkItem(akKatanaItem)
+						else -- Katana On Back
 							local character = localPlayer.Character
 							local torso = character and (character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso"))
 							local rootPart = v23
-							local stickyPart = v18 and v18:FindFirstChild("StickyPart")
+							local stickyPart = akKatanaItem and akKatanaItem:FindFirstChild("StickyPart")
 							local stickyWeld = stickyPart and stickyPart:FindFirstChild("StickyWeld")
-							local katanaIsOnBack = v18 and v18.Parent and v18.Name == "KatanaAntiKickRSC"
+							local katanaIsOnBack = akKatanaItem and akKatanaItem.Parent and akKatanaItem.Name == "KatanaAntiKickRSC"
 								and torso and stickyWeld and stickyWeld.Parent
 								and (stickyWeld.Part0 == torso or stickyWeld.Part1 == torso)
 
-							if v18 and not katanaIsOnBack then
+							if akKatanaItem and not katanaIsOnBack then
 								pcall(function()
-									tbl12.DestroyToy(v18)
+									tbl12.DestroyToy(akKatanaItem)
 								end)
-								v18 = nil
+								akKatanaItem = nil
 							end
 
-							if not v18 and torso and rootPart and rootPart:IsA("BasePart") and os.clock() >= akKatanaNextSpawnAttempt then
+							if not akKatanaItem and torso and rootPart and rootPart:IsA("BasePart") and os.clock() >= akKatanaNextSpawnAttempt then
 								akKatanaNextSpawnAttempt = os.clock() + 0.35
 								-- Match the Shuriken spawn height: spawn 15 studs above the
 								-- player first, then attach using Jawstands' back-positioning offset.
@@ -34957,7 +34998,7 @@ Escape Timer: %*]]
 									if newStickyWeld.Parent and (newStickyWeld.Part0 == torso or newStickyWeld.Part1 == torso)
 										and tbl8.AntiKick and not flag11 and localPlayer.Character == character then
 										katana.Name = "KatanaAntiKickRSC"
-										v18 = katana
+										akKatanaItem = katana
 									else
 										tbl12.DestroyToy(katana)
 									end
@@ -34968,27 +35009,36 @@ Escape Timer: %*]]
 								end
 							end
 
-							if v18 and v18.Parent and v18.Name == "KatanaAntiKickRSC" then
-								styleAntiKickItem(v18, antiKickSettings)
+							if akKatanaItem and akKatanaItem.Parent and akKatanaItem.Name == "KatanaAntiKickRSC" then
+								styleAntiKickItem(akKatanaItem, antiKickSettings)
 							end
 
-						elseif tbl9.AKType == "Pencil Dih" then
+						end
+
+						if not akTypeSelected("Pencil Dih") then
+							akPencilItem = destroyAkItem(akPencilItem)
+							if akDonut then
+								pcall(function() tbl12.DestroyToy(akDonut) end)
+								akDonut = nil
+								akDonutRoot = nil
+							end
+						else -- Pencil Dih
 							local character = localPlayer.Character
 							local torso = character and (character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso"))
 							local rootPart = v23
-							local stickyPart = v18 and v18:FindFirstChild("StickyPart")
+							local stickyPart = akPencilItem and akPencilItem:FindFirstChild("StickyPart")
 							local stickyWeld = stickyPart and stickyPart:FindFirstChild("StickyWeld")
-							local pencilIsStuck = v18 and v18.Parent and v18.Name == "PencilAntiKickRSC"
+							local pencilIsStuck = akPencilItem and akPencilItem.Parent and akPencilItem.Name == "PencilAntiKickRSC"
 								and torso and stickyWeld and stickyWeld.Parent
 								and (stickyWeld.Part0 == torso or stickyWeld.Part1 == torso)
 
-							if v18 and not pencilIsStuck then
-								pcall(function() tbl12.DestroyToy(v18) end)
-								v18 = nil
+							if akPencilItem and not pencilIsStuck then
+								pcall(function() tbl12.DestroyToy(akPencilItem) end)
+								akPencilItem = nil
 							end
 
 							-- Async attach: SNO yields; must not block the AntiKick Heartbeat loop.
-							if not v18 and torso and rootPart and rootPart:IsA("BasePart")
+							if not akPencilItem and torso and rootPart and rootPart:IsA("BasePart")
 								and os.clock() >= akPencilNextSpawnAttempt and not akPencilBusy then
 								akPencilNextSpawnAttempt = os.clock() + 0.35
 								akPencilBusy = true
@@ -35059,7 +35109,7 @@ Escape Timer: %*]]
 												end
 											end)
 											pencil.Name = "PencilAntiKickRSC"
-											v18 = pencil
+											akPencilItem = pencil
 										else
 											tbl12.DestroyToy(pencil)
 										end
@@ -35072,20 +35122,20 @@ Escape Timer: %*]]
 								end)
 							end
 
-							if v18 and v18.Parent and v18.Name == "PencilAntiKickRSC" then
-								styleAntiKickItem(v18, antiKickSettings)
+							if akPencilItem and akPencilItem.Parent and akPencilItem.Name == "PencilAntiKickRSC" then
+								styleAntiKickItem(akPencilItem, antiKickSettings)
 							end
 
 							-- Donut Beast: same pattern as Coconut Forms (SNO + root.CFrame, no anchor).
-							if tbl8.DonutBeast and tbl8.AntiKick and tbl9.AKType == "Pencil Dih"
-								and v18 and v18.Parent and v18.Name == "PencilAntiKickRSC" then
-								local pencilMesh = v18:FindFirstChild("Meshpart") or v18:FindFirstChild("StickyPart")
+							if tbl8.DonutBeast and tbl8.AntiKick and akTypeSelected("Pencil Dih")
+								and akPencilItem and akPencilItem.Parent and akPencilItem.Name == "PencilAntiKickRSC" then
+								local pencilMesh = akPencilItem:FindFirstChild("Meshpart") or akPencilItem:FindFirstChild("StickyPart")
 								if pencilMesh and pencilMesh:IsA("BasePart") then
 									if not (akDonut and akDonut.Parent) and not akDonutBusy then
 										akDonutBusy = true
 										task.spawn(function()
 											local okD, errD = pcall(function()
-												if not (v18 and v18.Parent and pencilMesh.Parent) then
+												if not (akPencilItem and akPencilItem.Parent and pencilMesh.Parent) then
 													return
 												end
 												local spawnCf = (v23 and v23.CFrame or pencilMesh.CFrame) + Vector3.new(0, 15, 0)
@@ -37296,6 +37346,7 @@ Escape Timer: %*]]
 		local watermarkAppliedIcon = nil
 		local watermarkChromaState = nil
 		local watermarkChromaConnection = nil
+		local watermarkChromaSpeed = tonumber(tbl9.WatermarkChromaSpeed) or 120
 		tbl9.WatermarkStyle = "HuiG Custom"
 
 		Watermark = lib:AddDraggableLabel("HuiG Custom", huiGLogoAsset)
@@ -37318,47 +37369,72 @@ Escape Timer: %*]]
 		end
 
 		local function ensureWatermarkChromaGradient(stroke, enabled)
-			if not stroke then return end
+			if not stroke then return false end
 			local gradient = stroke:FindFirstChild("HuiGWatermarkChroma")
 			if enabled then
+				-- Outline = black; wave highlight = pure white (stroke must stay white or gradient looks grey)
+				local darker = Color3.new(0, 0, 0)
+				local white = Color3.new(1, 1, 1)
+				local seq = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, darker),
+					ColorSequenceKeypoint.new(0.35, white),
+					ColorSequenceKeypoint.new(0.5, white),
+					ColorSequenceKeypoint.new(0.65, white),
+					ColorSequenceKeypoint.new(1, darker),
+				})
 				if not gradient then
 					gradient = Instance.new("UIGradient")
 					gradient.Name = "HuiGWatermarkChroma"
-					gradient.Color = ColorSequence.new({
-						ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 128)),
-						ColorSequenceKeypoint.new(0.2, Color3.fromRGB(255, 200, 0)),
-						ColorSequenceKeypoint.new(0.4, Color3.fromRGB(0, 255, 180)),
-						ColorSequenceKeypoint.new(0.6, Color3.fromRGB(0, 140, 255)),
-						ColorSequenceKeypoint.new(0.8, Color3.fromRGB(180, 0, 255)),
-						ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 128)),
-					})
 					gradient.Parent = stroke
 				end
+				gradient.Color = seq
 				gradient.Enabled = true
+				stroke.Enabled = true
 				stroke.Thickness = 1.8
-				stroke.Color = Color3.new(1, 1, 1)
+				stroke.Transparency = 0
+				stroke.Color = Color3.new(1, 1, 1) -- required: multiplies with gradient
+				return true
 			else
 				if gradient then gradient.Enabled = false; gradient:Destroy() end
 				stroke.Thickness = 1
 				stroke.Color = (lib.Scheme and lib.Scheme.OutlineColor) or Color3.fromRGB(62, 74, 85)
+				return true
 			end
 		end
 
 		local function applyWatermarkChroma(enabled)
 			local on = enabled == true
-			local stroke = Watermark and Watermark.Label and Watermark.Label:FindFirstChildOfClass("UIStroke")
-			local gradient = stroke and stroke:FindFirstChild("HuiGWatermarkChroma")
-			local needsRefresh = watermarkChromaState ~= on or (on and stroke and not gradient)
-			if needsRefresh then
-				ensureWatermarkChromaGradient(stroke, on)
-				watermarkChromaState = on
+			local label = Watermark and Watermark.Label
+			local stroke = label and label:FindFirstChildOfClass("UIStroke")
+			-- Always re-apply while on so config/theme load cannot leave a dark/grey stroke
+			if on then
+				if not stroke and label then
+					stroke = Instance.new("UIStroke")
+					stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+					stroke.Parent = label
+				end
+				ensureWatermarkChromaGradient(stroke, true)
+				watermarkChromaState = true
+			else
+				if stroke then ensureWatermarkChromaGradient(stroke, false) end
+				watermarkChromaState = false
 			end
 			if on and not watermarkChromaConnection then
 				watermarkChromaConnection = game:GetService("RunService").RenderStepped:Connect(function()
 					local currentStroke = Watermark and Watermark.Label and Watermark.Label:FindFirstChildOfClass("UIStroke")
 					local currentGradient = currentStroke and currentStroke:FindFirstChild("HuiGWatermarkChroma")
-					if currentGradient and currentGradient.Enabled then
-						currentGradient.Rotation = (os.clock() * 120) % 360
+					if currentStroke and currentGradient and currentGradient.Enabled then
+						-- keep stroke pure white so white keypoints stay white after config load
+						if currentStroke.Color ~= Color3.new(1, 1, 1) then
+							currentStroke.Color = Color3.new(1, 1, 1)
+						end
+						if currentStroke.Transparency ~= 0 then
+							currentStroke.Transparency = 0
+						end
+						currentGradient.Rotation = (os.clock() * (watermarkChromaSpeed or 120)) % 360
+					elseif watermarkChromaState then
+						-- stroke missing after reload — reattach
+						applyWatermarkChroma(true)
 					end
 				end)
 			elseif not on and watermarkChromaConnection then
@@ -37409,8 +37485,23 @@ Escape Timer: %*]]
 			watermarkElements = normalizeWatermarkElements(value)
 			tbl9.WatermarkElements = table.clone(watermarkElements)
 			applyWatermarkElements()
+			if tbl12.UpdateWatermarkChromaSpeedVisible then
+				tbl12.UpdateWatermarkChromaSpeedVisible()
+			end
 		end
 		tbl12.ApplyWatermarkSize = applyWatermarkSize
+		tbl12.SetWatermarkChromaSpeed = function(value)
+			local n = tonumber(value) or 120
+			watermarkChromaSpeed = math.clamp(n, 10, 400)
+			tbl9.WatermarkChromaSpeed = watermarkChromaSpeed
+		end
+		tbl12.UpdateWatermarkChromaSpeedVisible = function()
+			local slider = options and options.WatermarkChromaSpeed
+			if slider and slider.SetVisible then
+				local on = watermarkElements and watermarkElements["Chroma Wave"] == true
+				pcall(function() slider:SetVisible(on) end)
+			end
+		end
 		tbl12.SetWatermarkEnabled = function(enabled)
 			watermarkEnabled = enabled == true
 			if Watermark then
@@ -38171,18 +38262,14 @@ Escape Timer: %*]]
 				end
 
 				v19:AddDialog(dialogId, {
-					Title = "HuiG Custom V1.2 Changelog",
+					Title = "Small Update (no new version)",
 					Description = table.concat({
-						"• Added and reworked Pencil Control.",
-						"• Added Servershutdown under Lobotomy.",
-						"• Fixed Action Wheel aiming and full-button hitboxes.",
-						"• Reworked Changelog into an in-GUI dialog.",
-						"• Expanded Coconut Bend to ±180° up/down and left/right.",
-						"• Added Katana On Back Anti-Kick option.",
-						"• Fixed command bar execution and target respawn handling.",
-						"• Added plot-based Coconut Forms capacity.",
-						"• Added Action Wheel order editor.",
-						"• Added customizable watermark elements.",
+						"• Reworked Watermark Chroma Wave.",
+						"• Fixed mouse cursor visibility a little bit (if the mouse cursor is visible in first person, open and close the items menu).",
+						"• Auto Find Cheaters now sends one combined notification,",
+						"• Coin Gain Sound and animation.",
+						"• Fixed Liquid-Glass Toy Menu hover missing on some toys.",
+                        "• Anti-Kick items are multi-select."
 					}, "\n"),
 					OutsideClickDismiss = true,
 					FooterButtons = {
@@ -40654,24 +40741,48 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 
 		Config:AddDropdown("AKTypeDropdown", {
 			Values = { "Shuriken", "Katana On Back", "Pencil Dih" },
-			Default = tbl9.AKType or "Shuriken",
-			Multi = false,
-			Text = "Anti-Kick Item",
-			Tooltip = "Choose the Anti-Kick item and its character placement.",
-			Callback = function(akType)
-				if tbl9.AKType ~= akType then
-					if v18 then
-						pcall(function()
-							tbl12.DestroyToy(v18)
-						end)
-						v18 = nil
+			Default = tbl9.AKTypes or { Shuriken = true },
+			Multi = true,
+			Text = "Anti-Kick Items",
+			Tooltip = "Select one or more Anti-Kick items. All selected types stay active at once.",
+			Callback = function(akTypes)
+				local allowed = { Shuriken = true, ["Katana On Back"] = true, ["Pencil Dih"] = true }
+				local nextTypes = {}
+				if type(akTypes) == "table" then
+					for k, v in pairs(akTypes) do
+						if v and allowed[k] then
+							nextTypes[k] = true
+						end
 					end
+				end
+				if not next(nextTypes) then
+					nextTypes.Shuriken = true
+				end
+				local prev = tbl9.AKTypes or {}
+				if prev.Shuriken and not nextTypes.Shuriken then
+					v18 = destroyAkItem and destroyAkItem(v18) or (function()
+						if v18 then pcall(tbl12.DestroyToy, v18) end
+						return nil
+					end)()
+				end
+				if prev["Katana On Back"] and not nextTypes["Katana On Back"] then
+					if akKatanaItem then pcall(tbl12.DestroyToy, akKatanaItem) end
+					akKatanaItem = nil
+				end
+				if prev["Pencil Dih"] and not nextTypes["Pencil Dih"] then
+					if akPencilItem then pcall(tbl12.DestroyToy, akPencilItem) end
+					akPencilItem = nil
 					if akDonut then
 						pcall(function() tbl12.DestroyToy(akDonut) end)
 						akDonut = nil
+						akDonutRoot = nil
 					end
-					tbl9.AKType = akType
 				end
+				tbl9.AKTypes = nextTypes
+				tbl9.AKType = (nextTypes.Shuriken and "Shuriken")
+					or (nextTypes["Katana On Back"] and "Katana On Back")
+					or (nextTypes["Pencil Dih"] and "Pencil Dih")
+					or "Shuriken"
 			end,
 		})
 
@@ -49749,7 +49860,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 	CheatersGB:AddToggle("AutoFindCheaters", {
 		Text = "Auto Find Cheaters",
 		Default = false,
-		Tooltip = "Scans every ~1.5s. Notifies once per cheater, then ignores them.",
+		Tooltip = "Scans every ~1.5s. One combined notification per scan (like Find Cheaters). Ignores already flagged.",
 		Callback = function(enabled)
 			tbl8.AutoFindCheaters = enabled
 			if not enabled then return end
@@ -49758,6 +49869,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				while tbl8.AutoFindCheaters and not flag11 do
 					task.wait(1.5)
 					if not tbl8.AutoFindCheaters or flag11 then break end
+					local found = {}
 					for _, plr in pairs(Players:GetPlayers()) do
 						if plr == localPlayer then continue end
 						if tbl7.AlreadyFlaggedCheaters[plr.UserId] then continue end
@@ -49788,11 +49900,18 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 								Reason = reason,
 								Time = os.date("%H:%M:%S"),
 							}
-							if tbl12.RefreshCheaterScoreboard then
-								pcall(tbl12.RefreshCheaterScoreboard)
-							end
-							fn18("Cheater: " .. tbl12.FormatPlayer(plr) .. " — " .. reason)
+							found[plr] = reason
 						end
+					end
+					if next(found) then
+						if tbl12.RefreshCheaterScoreboard then
+							pcall(tbl12.RefreshCheaterScoreboard)
+						end
+						local str5 = "Cheaters Found\n\n"
+						for plr, reason in pairs(found) do
+							str5 ..= ("[%*]\n%*\n\n"):format(tbl12.FormatPlayer(plr), reason)
+						end
+						fn18(str5:sub(1, -3))
 					end
 				end
 			end)
@@ -50126,6 +50245,23 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				if tbl12.ApplyWatermarkSize then tbl12.ApplyWatermarkSize(value) end
 			end,
 		})
+
+		Menu:AddSlider("WatermarkChromaSpeed", {
+			Text = "Chroma Wave Speed",
+			Default = 120,
+			Min = 10,
+			Max = 400,
+			Rounding = 0,
+			Compact = true,
+			Callback = function(value)
+				if tbl12.SetWatermarkChromaSpeed then tbl12.SetWatermarkChromaSpeed(value) end
+			end,
+		})
+		task.defer(function()
+			if tbl12.UpdateWatermarkChromaSpeedVisible then
+				tbl12.UpdateWatermarkChromaSpeedVisible()
+			end
+		end)
 
 		Menu:AddDivider("Keybind Menu")
 
@@ -54019,6 +54155,19 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
                 "gradient", "rejoin", "rj", "black", "dark", "logo",
                 "close", "exit",
             },
+            -- Always style these (never treat as protected), even if a keyword matches.
+            -- Toy display names / model ids that collide with Keywords substrings:
+            --   dark  → BombDarkMatter, *DarkGray chairs/couches/ovens
+            --   black → FridgeBlack
+            --   color → DiscoColorBall
+            ForceStyle = {
+                BombDarkMatter = true,   -- Unstable Substance
+                ArmChairDarkGray = true, -- Arm Chair (dark gray)
+                CouchDarkGray = true,    -- Couch (dark gray)
+                OvenDarkGray = true,     -- Oven (dark gray)
+                FridgeBlack = true,      -- Refrigerator
+                DiscoColorBall = true,   -- Disco Cube
+            },
         }
 
         local LiquidGlassUserInput = game:GetService("UserInputService")
@@ -54095,6 +54244,35 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
         end
 
         local function liquidGlassProtected(instance)
+            -- Toy cells must always get glass + hover. Their model ids often contain
+            -- keyword substrings ("dark", "black", "color") which would otherwise
+            -- mark the whole cell as protected. SPAWNABLE_TOYS is the full shop list.
+            local forceStyle = LiquidGlassConfig.ForceStyle
+            local function isToyCellName(name)
+                if not name or name == "" then
+                    return false
+                end
+                if forceStyle and forceStyle[name] then
+                    return true
+                end
+                if SPAWNABLE_TOYS and SPAWNABLE_TOYS[name] then
+                    return true
+                end
+                return false
+            end
+
+            if instance then
+                local node = instance
+                local forceDepth = 0
+                while node and forceDepth < 8 do
+                    if isToyCellName(node.Name) then
+                        return false
+                    end
+                    node = node.Parent
+                    forceDepth += 1
+                end
+            end
+
             local function containsKeyword(name)
                 local lowerName = string.lower(name or "")
                 for _, keyword in ipairs(LiquidGlassConfig.Keywords) do
@@ -54791,6 +54969,184 @@ do
 	-- Hook cleanup so Peak Visuals / script unload reverts the coin design.
 	HuiGCoinBoxCleanup = _removeCoin
 end
+
+	----------------------------------------------------------------------
+	-- Coin amount count-up + floating +N + sound (only when coins increase)
+	----------------------------------------------------------------------
+	do
+		local TweenService = game:GetService("TweenService")
+		local SoundService = game:GetService("SoundService")
+		local coinAnimConn = nil
+		local coinAnimToken = 0
+		local coinDisplayValue = nil
+		local coinAnimating = false
+		local coinsFrameRef = nil
+		local COIN_SOUND_ID = "rbxassetid://100222706733839"
+
+		local function parseCoinText(text)
+			if type(text) ~= "string" then return nil end
+			local cleaned = text:gsub("[^%d%-]", "")
+			if cleaned == "" or cleaned == "-" then return nil end
+			return tonumber(cleaned)
+		end
+
+		local function formatCoin(n)
+			return tostring(math.floor(n + 0.5))
+		end
+
+		local function playCoinSound()
+			pcall(function()
+				local s = Instance.new("Sound")
+				s.SoundId = COIN_SOUND_ID
+				s.Volume = 0.55
+				s.PlaybackSpeed = 1 + (math.random() * 0.12 - 0.06)
+				s.Parent = SoundService
+				s:Play()
+				s.Ended:Connect(function()
+					s:Destroy()
+				end)
+				task.delay(3, function()
+					if s and s.Parent then s:Destroy() end
+				end)
+			end)
+		end
+
+		-- floating "+50" to the LEFT of CoinsFrame, rises and fades
+		local function spawnGainPopup(delta)
+			pcall(function()
+				local frame = coinsFrameRef
+				if not frame or not frame.Parent then return end
+
+				local popup = Instance.new("TextLabel")
+				popup.Name = "HuiG_CoinGainPopup"
+				popup.BackgroundTransparency = 1
+				popup.BorderSizePixel = 0
+				popup.Text = "+" .. tostring(math.floor(delta + 0.5))
+				popup.Font = Enum.Font.FredokaOne
+				popup.TextSize = 32
+				popup.TextColor3 = Color3.fromRGB(255, 255, 255)
+				popup.TextStrokeTransparency = 0.25
+				popup.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+				popup.TextXAlignment = Enum.TextXAlignment.Right
+				popup.TextYAlignment = Enum.TextYAlignment.Center
+				popup.ZIndex = 200
+				popup.AnchorPoint = Vector2.new(1, 0.5)
+				popup.Size = UDim2.fromOffset(140, 40)
+				-- LEFT of CoinsFrame: right edge of popup sits just outside the left edge of the frame
+				popup.Position = UDim2.new(0, -12, 0.5, 0)
+				popup.Visible = true
+				popup.Parent = frame
+
+				local startClock = os.clock()
+				local dur = 1.6
+				local conn
+				conn = game:GetService("RunService").RenderStepped:Connect(function()
+					if not popup.Parent then
+						if conn then conn:Disconnect() end
+						return
+					end
+					local a = math.clamp((os.clock() - startClock) / dur, 0, 1)
+					-- float upward (negative Y) while staying on the left
+					popup.Position = UDim2.new(0, -12, 0.5, -56 * a)
+					popup.TextTransparency = a
+					popup.TextStrokeTransparency = 0.25 + 0.75 * a
+					if a >= 1 then
+						if conn then conn:Disconnect() end
+						popup:Destroy()
+					end
+				end)
+			end)
+		end
+
+		local function animateCoinLabel(label, fromVal, toVal)
+			coinAnimToken += 1
+			local token = coinAnimToken
+			coinAnimating = true
+			local delta = toVal - fromVal
+			local start = os.clock()
+			local duration = math.clamp(0.85 + math.min(math.abs(delta) / 3500, 1.15), 0.85, 2.0)
+
+			spawnGainPopup(delta)
+			playCoinSound()
+
+			task.spawn(function()
+				while true do
+					if token ~= coinAnimToken then break end
+					local alpha = math.clamp((os.clock() - start) / duration, 0, 1)
+					local eased = 1 - (1 - alpha) ^ 3
+					local current = fromVal + (toVal - fromVal) * eased
+					coinDisplayValue = current
+					if label and label.Parent then
+						label.Text = formatCoin(current)
+					end
+					if alpha >= 1 then break end
+					task.wait()
+				end
+				if token == coinAnimToken and label and label.Parent then
+					coinDisplayValue = toVal
+					label.Text = formatCoin(toVal)
+				end
+				if token == coinAnimToken then
+					coinAnimating = false
+				end
+			end)
+		end
+
+		local function hookCoinAmount(label)
+			if not label or not (label:IsA("TextLabel") or label:IsA("TextButton")) then return end
+			if coinAnimConn then
+				pcall(function() coinAnimConn:Disconnect() end)
+				coinAnimConn = nil
+			end
+			coinDisplayValue = parseCoinText(label.Text) or 0
+
+			coinAnimConn = label:GetPropertyChangedSignal("Text"):Connect(function()
+				if coinAnimating then return end
+				local newVal = parseCoinText(label.Text)
+				if newVal == nil then return end
+				local oldVal = coinDisplayValue
+				if oldVal == nil then
+					coinDisplayValue = newVal
+					return
+				end
+				if newVal > oldVal then
+					animateCoinLabel(label, oldVal, newVal)
+				else
+					coinDisplayValue = newVal
+				end
+			end)
+		end
+
+		task.spawn(function()
+			pcall(function()
+				local topRight = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("MenuGui"):WaitForChild("TopRight", 15)
+				if not topRight then return end
+				local coinsFrame = topRight:FindFirstChild("CoinsFrame")
+				coinsFrameRef = coinsFrame
+				local display = coinsFrame and coinsFrame:FindFirstChild("CoinsDisplay")
+				local amount = display and display:FindFirstChild("Coins")
+				if not (amount and amount:IsA("TextLabel")) then
+					amount = topRight:FindFirstChild("Coins", true)
+				end
+				if amount and (amount:IsA("TextLabel") or amount:IsA("TextButton")) then
+					hookCoinAmount(amount)
+				end
+			end)
+		end)
+
+		local prevCleanup = HuiGCoinBoxCleanup
+		HuiGCoinBoxCleanup = function()
+			coinAnimToken += 1
+			coinAnimating = false
+			if coinAnimConn then
+				pcall(function() coinAnimConn:Disconnect() end)
+				coinAnimConn = nil
+			end
+			if type(prevCleanup) == "function" then
+				pcall(prevCleanup)
+			end
+		end
+	end
 
         task.spawn(function()
             pcall(function()
@@ -56675,6 +57031,14 @@ end
 		if v18 then
 			pcall(tbl12.DestroyToy, v18)
 			v18 = nil
+		end
+		if akKatanaItem then
+			pcall(tbl12.DestroyToy, akKatanaItem)
+			akKatanaItem = nil
+		end
+		if akPencilItem then
+			pcall(tbl12.DestroyToy, akPencilItem)
+			akPencilItem = nil
 		end
 
 		tbl12.ClearCustomAssets()
@@ -61841,4 +62205,28 @@ SOFTWARE.
 ]====]
 local run, message = loadstring(sources.Bootstrap, "@Resonance/Bootstrap")
 assert(run, message)
-return run(sources)
+local result = run(sources)
+
+-- No first-person cursor hide (that broke FTAP inventory).
+-- Only ensure: when the mouse is unlocked, the system pointer is visible and not a blank icon.
+pcall(function()
+    local RunService = game:GetService("RunService")
+    local UserInputService = game:GetService("UserInputService")
+    RunService:UnbindFromRenderStep("ResoFirstPersonCursor")
+    RunService:UnbindFromRenderStep("HuiGThirdPersonMouseIconVisible")
+
+    RunService:BindToRenderStep("ResoFirstPersonCursor", Enum.RenderPriority.Last.Value + 50, function()
+        -- Unlocked = inventory / free mouse. Keep a real visible system cursor.
+        if UserInputService.MouseBehavior == Enum.MouseBehavior.Default then
+            if not UserInputService.MouseIconEnabled then
+                UserInputService.MouseIconEnabled = true
+            end
+            -- Empty MouseIcon = Roblox default pointer (clears a transparent/custom blank icon).
+            if UserInputService.MouseIcon ~= "" then
+                UserInputService.MouseIcon = ""
+            end
+        end
+    end)
+end)
+
+return result

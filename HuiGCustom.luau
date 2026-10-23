@@ -38681,19 +38681,27 @@ Escape Timer: %*]]
 			padding.PaddingRight = UDim.new(0, 8)
 			padding.Parent = scroller
 
-			local body = Instance.new("TextLabel")
-			body.BackgroundTransparency = 1
-			body.Size = UDim2.new(1, -6, 0, 0)
-			body.AutomaticSize = Enum.AutomaticSize.Y
-			body.FontFace = scheme.Font
-			body.TextSize = 14
-			body.TextColor3 = scheme.FontColor
-			body.TextWrapped = true
-			body.RichText = false
-			body.TextXAlignment = Enum.TextXAlignment.Left
-			body.TextYAlignment = Enum.TextYAlignment.Top
-			body.Text = table.concat(lines, "\n")
-			body.Parent = scroller
+			local list = Instance.new("UIListLayout")
+			list.Padding = UDim.new(0, 6) -- a little air between entries
+			list.SortOrder = Enum.SortOrder.LayoutOrder
+			list.Parent = scroller
+
+			for i, line in ipairs(lines) do
+				local body = Instance.new("TextLabel")
+				body.BackgroundTransparency = 1
+				body.Size = UDim2.new(1, -6, 0, 0)
+				body.AutomaticSize = Enum.AutomaticSize.Y
+				body.FontFace = scheme.Font
+				body.TextSize = 14
+				body.TextColor3 = scheme.FontColor
+				body.TextWrapped = true
+				body.RichText = false
+				body.TextXAlignment = Enum.TextXAlignment.Left
+				body.TextYAlignment = Enum.TextYAlignment.Top
+				body.LayoutOrder = i
+				body.Text = line
+				body.Parent = scroller
+			end
 
 			scroller.Parent = tab.Container
 			pcall(function() tab:Resize() end)
@@ -38717,8 +38725,9 @@ Escape Timer: %*]]
 			end)
 			pcall(function()
 				Statistics:AddImage("GameBanner", {
-					Image = ("rbxthumb://type=GameIcon&id=%d&w=512&h=512"):format(game.GameId),
-					Height = 110,
+					-- 16:9 place thumbnail fits the wide box; the square GameIcon got cut off.
+					Image = ("rbxthumb://type=Asset&id=%d&w=768&h=432"):format(game.PlaceId),
+					Height = 150,
 					Color = Color3.new(1, 1, 1),
 					Transparency = 0,
 					BackgroundTransparency = 1,
@@ -38746,6 +38755,16 @@ Escape Timer: %*]]
 			local Usage = HomeBox:AddTab("Usage", "chart-bar")
 			local _fpsLbl = Usage:AddLabel("FPSLabel", { Text = "FPS: <b>--</b>", DoesWrap = true })
 			local _pingLbl = Usage:AddLabel("PingLabel", { Text = "Ping: <b>-- ms</b>", DoesWrap = true })
+
+			-- How many times the script was run, kept in a file in the executor workspace.
+			local executions = nil
+			pcall(function()
+				local path = "HuiGCustom_Executions.txt"
+				local count = (isfile(path) and tonumber(readfile(path)) or 0) + 1
+				writefile(path, tostring(count))
+				executions = count
+			end)
+			Usage:AddLabel("ExecutionsLabel", { Text = ("Executions: <b>%s</b>"):format(executions or "?"), DoesWrap = true })
 			getgenv()._HomeLblFPS = _fpsLbl
 			getgenv()._HomeLblPing = _pingLbl
 

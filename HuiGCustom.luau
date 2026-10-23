@@ -17366,7 +17366,14 @@ do
 								end
 							end
 
-							getgenv().ResonanceOriginalFallenHeight = workspace.FallenPartsDestroyHeight
+							do
+								-- Only remember a real height (NaN ~= NaN): running the script again while
+								-- void is already disabled must not save "disabled" as the original.
+								local currentHeight = workspace.FallenPartsDestroyHeight
+								if currentHeight == currentHeight then
+									getgenv().ResonanceOriginalFallenHeight = currentHeight
+								end
+							end
                             pcall(function() workspace.FallenPartsDestroyHeight = fallenPartsDestroyHeight end)
 
                         registerCleanup(function()
@@ -17563,6 +17570,7 @@ do
 							SuperStrength = false,
 							Desync = false,
 							JerkOff = false,
+							BangOff = false,
 							LoopTpLocation = false,
 							AutoSeatBlobman = false,
 							FreezeBlobman = false,
@@ -17573,6 +17581,8 @@ do
 							AntiBurn = false,
 							AntiExplosion = false,
 							AntiKick = false,
+							AntiKickItem = false,
+							AnchorGrabNotify = false,
 							AntiKick2 = false,
 							DonutBeast = false,
 							AntiPaint = false,
@@ -17747,6 +17757,8 @@ do
 
 						tbl7 = {
 							Whitelisted = {},
+							AnchorWhitelisted = {},
+							AnchorGrabAlerts = {},
 							SelectedPlayers = {},
 							SelectedPlayersBlob = {},
 							SelectedPlayersExp = {},
@@ -19436,6 +19448,30 @@ do
 						tbl11.SetNetworkOwner:FireServer(arg, cframe)
 					end
 
+					-- Fires network ownership 10-15 times (random count, random grab point each
+					-- time). Runs in the background, or blocks until done when waitUntilDone is true.
+					tbl12.OwnershipBurst = function(parts, waitUntilDone)
+						local list = {}
+						for _, part in ipairs(parts) do
+							if typeof(part) == "Instance" and part:IsA("BasePart") then table.insert(list, part) end
+						end
+						if #list == 0 then return end
+						local count = math.random(10, 15)
+						local function run()
+							for i = 1, count do
+								local part = list[(i - 1) % #list + 1]
+								if not part.Parent then break end
+								pcall(function()
+									local _, root = tbl12.Char()
+									if not root then return end
+									local offset = CFrame.new((math.random() - 0.5) * 3, (math.random() - 0.5) * 1.5, (math.random() - 0.5) * 3)
+									tbl12.Grab(part, root.CFrame * offset)
+								end)
+								task.wait()
+							end
+						end
+						if waitUntilDone then run() else task.spawn(run) end
+					end
 					tbl12.SNO = function(arg, arg2, arg3)
 						local v24, v25, v26 = tbl12.Char()
 						local head = v24 and v24:FindFirstChild("Head")
@@ -21052,7 +21088,7 @@ end
 						if tbl8.DestroyVoid then
 							fallenPartsDestroyHeight2 = (0/0)
 						else
-							fallenPartsDestroyHeight2 = -100
+							fallenPartsDestroyHeight2 = getgenv().ResonanceOriginalFallenHeight or -500
 						end
 
 						v27.FallenPartsDestroyHeight = fallenPartsDestroyHeight2
@@ -27507,7 +27543,7 @@ end
 						if tbl8.DestroyVoid then
 							fallenPartsDestroyHeight2 = (0/0)
 						else
-							fallenPartsDestroyHeight2 = -100
+							fallenPartsDestroyHeight2 = getgenv().ResonanceOriginalFallenHeight or -500
 						end
 
 						v25.FallenPartsDestroyHeight = fallenPartsDestroyHeight2
@@ -27545,7 +27581,7 @@ end
 							if tbl8.DestroyVoid then
 								fallenPartsDestroyHeight2 = (0/0)
 							else
-								fallenPartsDestroyHeight2 = -100
+								fallenPartsDestroyHeight2 = getgenv().ResonanceOriginalFallenHeight or -500
 							end
 
 							v22.FallenPartsDestroyHeight = fallenPartsDestroyHeight2
@@ -27573,10 +27609,14 @@ end
 						if tbl8.DestroyVoid then
 							fallenPartsDestroyHeight2 = (0/0)
 						else
-							fallenPartsDestroyHeight2 = -100
+							fallenPartsDestroyHeight2 = getgenv().ResonanceOriginalFallenHeight or -500
 						end
 
 						v22.FallenPartsDestroyHeight = fallenPartsDestroyHeight2
+
+						if toggles.DisblVoid then
+							toggles.DisblVoid:SetDisabled(false)
+						end
 					end
 
 					anchorSettings = tbl7.AnchorSettings
@@ -27589,6 +27629,90 @@ end
 
 					fn21 = function(arg)
 						return tbl12.IsPartOwner(arg) or tbl12.IsNetworkOwner(arg)
+					end
+
+					-- Anchor Whitelist: returns the whitelisted player currently holding this anchored toy (via its PartOwner tag)
+					tbl12.GetAnchorWhitelistHolder = function(objectState)
+						local whitelist = tbl7.AnchorWhitelisted
+						if not whitelist or next(whitelist) == nil then
+							return nil
+						end
+						local parts = objectState.Parts
+						if not parts then
+							return nil
+						end
+						local myName = localPlayer.Name
+						for _, part in ipairs(parts) do
+							if part.Parent then
+								local owner = part:FindFirstChild("PartOwner")
+								if owner and owner:IsA("StringValue") and owner.Value ~= "" and owner.Value ~= myName then
+									local plr = Players:FindFirstChild(owner.Value)
+									if plr and whitelist[plr] then
+										return plr
+									end
+								end
+							end
+						end
+						return nil
+					end
+
+					-- same PartOwner scan as whitelist, but returns any non-local holder (for grab alerts)
+					tbl12.GetAnchorPartOwnerPlayer = function(objectState)
+						local parts = objectState.Parts
+						if not parts then
+							return nil
+						end
+						local myName = localPlayer.Name
+						for _, part in ipairs(parts) do
+							if part.Parent then
+								local owner = part:FindFirstChild("PartOwner")
+								if owner and owner:IsA("StringValue") and owner.Value ~= "" and owner.Value ~= myName then
+									local plr = Players:FindFirstChild(owner.Value)
+									if plr then
+										return plr
+									end
+								end
+							end
+						end
+						return nil
+					end
+
+					tbl12.NotifyAnchorGrab = function(plr)
+						if not plr or not tbl8.AnchorGrabNotify then
+							return
+						end
+						local alerts = tbl7.AnchorGrabAlerts
+						if not alerts then
+							tbl7.AnchorGrabAlerts = {}
+							alerts = tbl7.AnchorGrabAlerts
+						end
+						local key = plr.UserId
+						local state = alerts[key]
+						local name = plr.DisplayName or plr.Name
+						local count = 1
+						if state then
+							count = (state.Count or 1) + 1
+							-- kill old note so timer fully resets
+							if state.Note and not state.Note.Destroyed then
+								pcall(function() state.Note:Destroy("script") end)
+							end
+						end
+						local desc
+						if count > 1 then
+							desc = ("%s grabbed an anchored part x%d"):format(name, count)
+						else
+							desc = ("%s grabbed an anchored part"):format(name)
+						end
+						local note = lib:Notify({
+							Title = "Anchor Grab",
+							Description = desc,
+							Time = 5,
+							SoundId = n34,
+							BigIcon = huiGLogoAsset,
+							Volume = n35,
+							IconColor = Color3.new(1, 1, 1),
+						})
+						alerts[key] = { Count = count, Note = note }
 					end
 
 					fn22 = function(arg)
@@ -28056,6 +28180,7 @@ end
 									return
 								end
 								arg.Anchored = anchored
+								-- clear whitelist drop-pose when user toggles anchor
 								local anchored2 = tbl7.Anchored
 								local target = arg.Target
 								local v22
@@ -28388,6 +28513,49 @@ end
 								if root and root.Parent then
 									local group = objectState.Group
 
+									-- Anchor grab notify + whitelist (PartOwner detection)
+									local isToyAnchor = objectState.Anchored and not (typeof(k) == "Instance" and k:IsA("Player"))
+									local partOwnerPlr = nil
+									if isToyAnchor then
+										partOwnerPlr = tbl12.GetAnchorPartOwnerPlayer(objectState)
+									end
+
+									if tbl8.AnchorGrabNotify and partOwnerPlr then
+										local whitelist = tbl7.AnchorWhitelisted
+										local isWhitelisted = whitelist and whitelist[partOwnerPlr]
+										if not isWhitelisted then
+											-- edge: only fire when a new grab starts (holder changed)
+											if objectState.PrevAnchorGrabber ~= partOwnerPlr then
+												objectState.PrevAnchorGrabber = partOwnerPlr
+												tbl12.NotifyAnchorGrab(partOwnerPlr)
+											end
+										else
+											objectState.PrevAnchorGrabber = partOwnerPlr
+										end
+									elseif not partOwnerPlr then
+										objectState.PrevAnchorGrabber = nil
+									end
+
+									-- Anchor Whitelist: let the whitelisted player move the toy, then re-anchor where they dropped it
+									local wlHolder = nil
+									if isToyAnchor then
+										wlHolder = tbl12.GetAnchorWhitelistHolder(objectState)
+									end
+
+									if wlHolder then
+										objectState.ExternalHolder = wlHolder
+										for _, node in pairs(objectState.Nodes) do
+											node.Position.Enabled = false
+											node.Orientation.Enabled = false
+										end
+										objectState.CFrame = root.CFrame
+										continue
+									elseif objectState.ExternalHolder then
+										-- released: objectState.CFrame already holds the last held position, normal anchoring resumes from it
+										objectState.ExternalHolder = nil
+										objectState.RetryAt = 0
+									end
+
 									if group and group.Driver == objectState and not objectState.Anchored and not objectState.Held then
 										objectState.CFrame = root.CFrame
 									end
@@ -28435,7 +28603,7 @@ end
 												local model = objectState.Model
 
 												local function fn35(arg)
-													return objectStates[k] == objectState and objectState.Model == model and (not arg or objectState.Nodes[arg] ~= nil)
+													return objectStates[k] == objectState and objectState.Model == model and not objectState.ExternalHolder and (not arg or objectState.Nodes[arg] ~= nil)
 												end
 
 												for _, v22 in ipairs(tbl17) do
@@ -35064,28 +35232,21 @@ Escape Timer: %*]]
 											return
 										end
 
-										-- no network ownership (same as pencil actions / Random Stick All)
-
 										if not (tbl8.AntiKick and not flag11 and localPlayer.Character == attachChar and attachTorso.Parent) then
 											tbl12.DestroyToy(pencil)
 											return
 										end
 
-										local targetCf = attachTorso.CFrame * AK_PENCIL_STICK_CFRAME
+										-- Grab 10-15x first (~0.2s) so we own it, then stick once.
+										tbl12.OwnershipBurst({ soundPart or newStickyPart }, true)
 										pcall(function()
-											local delta = targetCf * newStickyPart.CFrame:Inverse()
-											for _, part in ipairs(pencil:GetDescendants()) do
-												if part:IsA("BasePart") then
-													part.AssemblyLinearVelocity = Vector3.zero
-													part.AssemblyAngularVelocity = Vector3.zero
-													part.CFrame = delta * part.CFrame
-												end
-											end
+											tbl11.StickyPartEvent:FireServer(newStickyPart, attachTorso, AK_PENCIL_STICK_CFRAME)
 										end)
 
+										-- Only wait for the weld now; the stick is not fired again.
 										local startedAt = tick()
 										local attached = false
-										while tick() - startedAt < 1.0 do
+										while tick() - startedAt < 1.5 do
 											if not (newStickyWeld.Parent and pencil.Parent and attachTorso.Parent
 												and localPlayer.Character == attachChar and tbl8.AntiKick and not flag11) then
 												break
@@ -35094,9 +35255,6 @@ Escape Timer: %*]]
 												attached = true
 												break
 											end
-											pcall(function()
-												tbl11.StickyPartEvent:FireServer(newStickyPart, attachTorso, AK_PENCIL_STICK_CFRAME)
-											end)
 											task.wait(0.05)
 										end
 
@@ -36656,7 +36814,7 @@ Escape Timer: %*]]
 			Title = "<b>HuiG</b>",
 			Icon = huiGLogoAsset,
 			IconSize = UDim2.fromOffset(30, 30),
-			Footer = "<b>HuiG Custom V1.2</b>",
+			Footer = "<b>HuiG Custom V1.3</b>",
 			Font = Enum.Font.Gotham,
 			NotifySide = "Right",
 			ShowCustomCursor = true,
@@ -37320,7 +37478,7 @@ Escape Timer: %*]]
 			label.Position = UDim2.fromOffset(viewportSize.X * 0.5, viewportSize.Y * 0.8)
 		end
 
-		local watermarkElementOptions = { "Icon", "HuiG Custom", "FPS", "Ping", "Script Version", "Time", "Account", "Chroma Wave" }
+		local watermarkElementOptions = { "Icon", "HuiG Custom", "Script Version", "FPS", "Ping", "Time", "Date", "Session", "Players", "Memory", "Account", "Display Name", "Game", "Chroma Wave" }
 		local watermarkElementDefaults = { "Icon", "HuiG Custom", "FPS", "Ping", "Time" }
 		local function normalizeWatermarkElements(value)
 			local selected = {}
@@ -37355,19 +37513,151 @@ Escape Timer: %*]]
 		pcall(function()
 			Watermark.Label.AnchorPoint = Vector2.new(0.5, 0)
 			Watermark.Label.Position = UDim2.new(0.5, 0, 0, 28)
+			Watermark.Label.RichText = true
+			-- a little more breathing room than the library default
+			local padding = Watermark.Label:FindFirstChildOfClass("UIPadding")
+			if padding then
+				padding.PaddingTop = UDim.new(0, 7)
+				padding.PaddingBottom = UDim.new(0, 7)
+			end
 		end)
 
-		local function getWatermarkDisplayContent(fps, ping)
-			local parts = {}
-			if watermarkElements["HuiG Custom"] then table.insert(parts, "HuiG Custom") end
-			if watermarkElements.FPS then table.insert(parts, tostring(fps or watermarkFPS) .. " fps") end
-			if watermarkElements.Ping then table.insert(parts, tostring(ping or watermarkPing) .. " ms") end
-			if watermarkElements["Script Version"] then table.insert(parts, "V1.2") end
-			if watermarkElements.Time then table.insert(parts, os.date("%H:%M:%S")) end
-			if watermarkElements.Account then table.insert(parts, localPlayer.Name) end
-			return table.concat(parts, " | ")
+		-- Watermark style. Every field is set from the Watermark box in Settings.
+		local WATERMARK_TEXT_ELEMENTS = { "HuiG Custom", "Script Version", "FPS", "Ping", "Time", "Date", "Session", "Players", "Memory", "Account", "Display Name", "Game" }
+		local wmStyle = {
+			Order = table.clone(WATERMARK_TEXT_ELEMENTS),
+			Separator = "·",
+			Clock = "24h",
+			Seconds = true,
+			QualityColors = true,
+			Font = "Theme",
+			Corner = nil, -- nil = theme corner radius
+			CustomColors = false,
+			TextColor = Color3.new(1, 1, 1),
+			AccentColor = Color3.new(1, 1, 1),
+			BgColor = Color3.fromRGB(25, 25, 28),
+			BgTransparency = 0,
+			OutlineColor = Color3.fromRGB(55, 58, 61),
+		}
+		local wmSessionStart = tick()
+		local wmGameName = "Fling Things and People"
+		task.spawn(function()
+			local ok, info = pcall(function()
+				return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
+			end)
+			if ok and type(info) == "table" and type(info.Name) == "string" then
+				wmGameName = info.Name
+			end
+		end)
+
+		-- Rich text: values stand out, units and separators are dimmed, FPS / ping are
+		-- colored by quality. The label auto-sizes, so tags don't affect its width.
+		local WATERMARK_GOOD = Color3.fromRGB(110, 220, 140)
+		local WATERMARK_OK = Color3.fromRGB(240, 200, 90)
+		local WATERMARK_BAD = Color3.fromRGB(240, 95, 95)
+		local function wmColor(color, text)
+			return ('<font color="#%s">%s</font>'):format(color:ToHex(), text)
+		end
+		local function wmDim(text)
+			return ('<font transparency="0.55">%s</font>'):format(text)
+		end
+		local function wmEscape(text)
+			return (tostring(text):gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
+		end
+		local function wmQuality(value, goodBelow, okBelow, higherIsBetter)
+			if not wmStyle.QualityColors then return nil end
+			if higherIsBetter then
+				return value >= goodBelow and WATERMARK_GOOD or value >= okBelow and WATERMARK_OK or WATERMARK_BAD
+			end
+			return value < goodBelow and WATERMARK_GOOD or value < okBelow and WATERMARK_OK or WATERMARK_BAD
+		end
+		local function wmValue(color, text)
+			text = "<b>" .. text .. "</b>"
+			return color and wmColor(color, text) or text
 		end
 
+		local function wmPiece(name, fps, ping, accent)
+			if name == "HuiG Custom" then
+				return "<b>HuiG Custom</b>"
+			elseif name == "Script Version" then
+				return wmColor(accent, "<b>V1.3</b>")
+			elseif name == "FPS" then
+				return wmValue(wmQuality(fps, 55, 30, true), tostring(fps)) .. " " .. wmDim("fps")
+			elseif name == "Ping" then
+				return wmValue(wmQuality(ping, 90, 180, false), tostring(ping)) .. " " .. wmDim("ms")
+			elseif name == "Time" then
+				local format = wmStyle.Clock == "12h"
+					and (wmStyle.Seconds and "%I:%M:%S %p" or "%I:%M %p")
+					or (wmStyle.Seconds and "%H:%M:%S" or "%H:%M")
+				return os.date(format)
+			elseif name == "Date" then
+				return os.date("%d.%m.%Y")
+			elseif name == "Session" then
+				local seconds = math.floor(tick() - wmSessionStart)
+				if seconds >= 3600 then
+					return ("%d" .. wmDim("h") .. " %02d" .. wmDim("m")):format(seconds // 3600, (seconds % 3600) // 60)
+				end
+				return ("%d" .. wmDim("m") .. " %02d" .. wmDim("s")):format(seconds // 60, seconds % 60)
+			elseif name == "Players" then
+				return "<b>" .. #Players:GetPlayers() .. "</b>" .. wmDim("/" .. Players.MaxPlayers .. " players")
+			elseif name == "Memory" then
+				local mb = 0
+				pcall(function() mb = math.floor(Stats2:GetTotalMemoryUsageMb()) end)
+				return "<b>" .. mb .. "</b> " .. wmDim("MB")
+			elseif name == "Account" then
+				return wmDim("@") .. wmEscape(localPlayer.Name)
+			elseif name == "Display Name" then
+				return wmEscape(localPlayer.DisplayName)
+			elseif name == "Game" then
+				return wmEscape(wmGameName)
+			end
+			return nil
+		end
+
+		local function getWatermarkDisplayContent(fps, ping)
+			fps = tonumber(fps or watermarkFPS) or 0
+			ping = tonumber(ping or watermarkPing) or 0
+			local accent = wmStyle.CustomColors and wmStyle.AccentColor
+				or (lib.Scheme and lib.Scheme.AccentColor) or Color3.new(1, 1, 1)
+			local parts = {}
+			for _, name in ipairs(wmStyle.Order) do
+				if watermarkElements[name] then
+					local piece = wmPiece(name, fps, ping, accent)
+					if piece then table.insert(parts, piece) end
+				end
+			end
+			local separator = wmStyle.Separator == "Space" and "    " or wmDim("  " .. wmStyle.Separator .. "  ")
+			return table.concat(parts, separator)
+		end
+
+		-- Colors, font and corners. Re-applied every update so theme changes can't undo them.
+		local function applyWatermarkLook()
+			local label = Watermark and Watermark.Label
+			if not label then return end
+			local scheme = lib.Scheme or {}
+			if wmStyle.CustomColors then
+				label.TextColor3 = wmStyle.TextColor
+				label.BackgroundColor3 = wmStyle.BgColor
+				label.BackgroundTransparency = wmStyle.BgTransparency
+			else
+				if scheme.FontColor then label.TextColor3 = scheme.FontColor end
+				if scheme.BackgroundColor then label.BackgroundColor3 = scheme.BackgroundColor end
+				label.BackgroundTransparency = 0
+			end
+			local stroke = label:FindFirstChildOfClass("UIStroke")
+			if stroke and not watermarkChromaState then
+				stroke.Color = wmStyle.CustomColors and wmStyle.OutlineColor or (scheme.OutlineColor or stroke.Color)
+			end
+			if wmStyle.Font == "Theme" then
+				if scheme.Font then label.FontFace = scheme.Font end
+			else
+				pcall(function() label.FontFace = Font.fromEnum(Enum.Font[wmStyle.Font]) end)
+			end
+			local corner = label:FindFirstChildOfClass("UICorner")
+			if corner then
+				corner.CornerRadius = UDim.new(0, wmStyle.Corner or lib.CornerRadius or 4)
+			end
+		end
 		local function ensureWatermarkChromaGradient(stroke, enabled)
 			if not stroke then return false end
 			local gradient = stroke:FindFirstChild("HuiGWatermarkChroma")
@@ -37458,7 +37748,8 @@ Escape Timer: %*]]
 		end
 
 		local function hasWatermarkDisplayContent()
-			for _, key in ipairs({ "Icon", "HuiG Custom", "FPS", "Ping", "Script Version", "Time", "Account" }) do
+			if watermarkElements.Icon then return true end
+			for _, key in ipairs(WATERMARK_TEXT_ELEMENTS) do
 				if watermarkElements[key] then return true end
 			end
 			return false
@@ -37476,6 +37767,7 @@ Escape Timer: %*]]
 				Watermark:SetVisible(watermarkEnabled and hasWatermarkDisplayContent())
 			end
 			applyWatermarkChroma(visibleElements["Chroma Wave"] == true)
+			applyWatermarkLook()
 		end
 
 		-- Publish the local helpers because Settings is built in a separate scope below.
@@ -37490,6 +37782,63 @@ Escape Timer: %*]]
 			end
 		end
 		tbl12.ApplyWatermarkSize = applyWatermarkSize
+		tbl12.WatermarkTextElements = table.clone(WATERMARK_TEXT_ELEMENTS)
+		tbl12.SetWatermarkStyle = function(key, value)
+			wmStyle[key] = value
+			applyWatermarkElements()
+		end
+		-- Accepts "FPS, Ping, Time" (any case) or a list; unknown names are dropped and
+		-- missing ones are appended in default order. Returns the order as text.
+		tbl12.SetWatermarkOrder = function(value)
+			local canonical = {}
+			for _, name in ipairs(WATERMARK_TEXT_ELEMENTS) do canonical[name:lower()] = name end
+			local list = {}
+			if type(value) == "string" then
+				for piece in value:gmatch("[^,]+") do table.insert(list, piece) end
+			elseif type(value) == "table" then
+				list = value
+			end
+			local seen, order = {}, {}
+			for _, raw in ipairs(list) do
+				local name = canonical[tostring(raw):match("^%s*(.-)%s*$"):lower()]
+				if name and not seen[name] then
+					seen[name] = true
+					table.insert(order, name)
+				end
+			end
+			for _, name in ipairs(WATERMARK_TEXT_ELEMENTS) do
+				if not seen[name] then table.insert(order, name) end
+			end
+			wmStyle.Order = order
+			applyWatermarkElements()
+			return table.concat(order, ", ")
+		end
+		tbl12.MoveWatermarkElement = function(name, direction)
+			local order = wmStyle.Order
+			local index = table.find(order, name)
+			local target = index and index + direction
+			if target and target >= 1 and target <= #order then
+				order[index], order[target] = order[target], order[index]
+				applyWatermarkElements()
+			end
+			return table.concat(order, ", ")
+		end
+		tbl12.SetWatermarkPosition = function(preset)
+			local label = Watermark and Watermark.Label
+			local presets = {
+				["Top Center"] = { Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0, 28) },
+				["Top Left"] = { Vector2.new(0, 0), UDim2.fromOffset(12, 12) },
+				["Top Right"] = { Vector2.new(1, 0), UDim2.new(1, -12, 0, 12) },
+				["Bottom Left"] = { Vector2.new(0, 1), UDim2.new(0, 12, 1, -12) },
+				["Bottom Center"] = { Vector2.new(0.5, 1), UDim2.new(0.5, 0, 1, -12) },
+				["Bottom Right"] = { Vector2.new(1, 1), UDim2.new(1, -12, 1, -12) },
+			}
+			local spot = presets[preset]
+			if label and spot then
+				label.AnchorPoint = spot[1]
+				label.Position = spot[2]
+			end
+		end
 		tbl12.SetWatermarkChromaSpeed = function(value)
 			local n = tonumber(value) or 120
 			watermarkChromaSpeed = math.clamp(n, 10, 400)
@@ -38196,7 +38545,7 @@ Escape Timer: %*]]
 		end
 	end)
 	do
-		local Greetings = tbl15.Home:AddLeftGroupbox("<b>HuiG Custom</b>", "user-round-key", nil, nil, nil, "Greetings")
+		local Greetings = tbl15.Home:AddLeftGroupbox("<b>Welcome Back</b>", "house", nil, nil, nil, "Greetings")
 		pcall(function()
 			Greetings:SetDescription("Greetings")
 		end)
@@ -38204,7 +38553,7 @@ Escape Timer: %*]]
 		local thumbnail = string.format("rbxthumb://type=AvatarThumbnail&id=%d&w=420&h=420", localPlayer.UserId)
 		local avatar = Greetings:AddImage("MyIcon", {
 			Image = thumbnail,
-			Height = 225,
+			Height = 84,
 			Color = Color3.new(1, 1, 1),
 			Transparency = 0,
 			BackgroundTransparency = 1,
@@ -38248,54 +38597,168 @@ Escape Timer: %*]]
 		elseif hour >= 17 and hour < 21 then
 			greeting = "Evening"
 		end
-        Greetings:AddLabel({ Text = ("%s, <b>%s</b> "):format(greeting, localPlayer.DisplayName), DoesWrap = true })
-        Greetings:AddDivider()
-
+		Greetings:AddLabel({ Text = "<b>HuiG Custom V1.3</b>", DoesWrap = true, Size = 20 })
+		Greetings:AddLabel({ Text = ("Good %s, <b>%s</b>."):format(greeting:lower(), localPlayer.DisplayName), DoesWrap = true })
+		Greetings:AddLabel({ Text = "Thanks for using HuiG Custom!", DoesWrap = true })
+		Greetings:AddDivider("Quick Access")
 		Greetings:AddButton({
-			Text = "View Changelog",
+			Text = "Visuals",
+			Icon = "eye",
 			Func = function()
-				local dialogId = "HuiGChangelogV12"
-				local existingDialog = lib.Dialogues and lib.Dialogues[dialogId]
-				if existingDialog and not existingDialog.Destroyed then
-					existingDialog:Dismiss()
-					return
-				end
-
-				v19:AddDialog(dialogId, {
-					Title = "Small Update (no new version)",
-					Description = table.concat({
-						"• Reworked Watermark Chroma Wave.",
-						"• Fixed mouse cursor visibility a little bit (if the mouse cursor is visible in first person, open and close the items menu).",
-						"• Auto Find Cheaters now sends one combined notification,",
-						"• Coin Gain Sound and animation.",
-						"• Fixed Liquid-Glass Toy Menu hover missing on some toys.",
-                        "• Anti-Kick items are multi-select."
-					}, "\n"),
-					OutsideClickDismiss = true,
-					FooterButtons = {
-						{ Title = "Close", Order = 1, Variant = "Primary" },
-					},
-				})
+				pcall(function() tbl15.Visual:Show() end)
+			end,
+		}):AddButton({
+			Text = "Settings",
+			Icon = "settings",
+			Func = function()
+				pcall(function() tbl15.Settings:Show() end)
 			end,
 		})
-	end
+		-- Changelog: one tabbox with three tabs (Added / Changed / Fixed), each holding a scrollable text box.
+		-- Edit this table for each release.
+		local Changelog = {
+			Version = "HuiG Custom V1.3",
+			Added = {
+				"Blobman Target Settings: Auto Sit follows your target",
+				"Blobman Target Settings: Remove Blobman when Auto Sit turns off",
+				"Icons for Target and Blobman methods",
+				"Watermark elements: Date, Session, Players, Memory, Display Name, Game",
+				"Watermark customisation: colors, font, separator, clock, position, element order",
+				"Anti Kick [Item] is hidden in first person and can't be clicked",
+			},
+			Changed = {
+				"Redesigned Home tab (Welcome, Overview, Server, Changelog)",
+				"Redesigned watermark (colored FPS / Ping, cleaner look)",
+				"Redesigned Keyboard Free Keys window",
+				"Tabbed layouts: Invincibility, Anti-Kick, Toys Aura, Experimental, Anchor System, Blobman",
+				"Settings: Watermark box and Specialties (Command Bar / Action Wheel)",
+				"Pencil Anti-Kick / Pencil Control grab before sticking",
+			},
+			Fixed = {
+				"Pencil not sticking sometimes",
+				"Disable Void: turning it off used the wrong void height",
+				"Disable Void: void stayed off after running the script twice",
+				"Disable Void: toggle could get stuck greyed out",
+			},
+		}
+
+		local function addChangelogTab(tabbox, name, icon, entries)
+			local tab = tabbox:AddTab(name, icon)
+			local lines = {}
+			for _, entry in ipairs(entries) do
+				lines[#lines + 1] = "• " .. entry
+			end
+			if #lines == 0 then
+				lines[1] = "Nothing here yet."
+			end
+
+			local scheme = lib.Scheme
+			local scroller = Instance.new("ScrollingFrame")
+			scroller.Name = "ChangelogScroller"
+			scroller.BackgroundColor3 = scheme.BackgroundColor
+			scroller.BorderSizePixel = 0
+			scroller.Size = UDim2.new(1, 0, 0, 150)
+			scroller.CanvasSize = UDim2.new()
+			scroller.AutomaticCanvasSize = Enum.AutomaticSize.Y
+			scroller.ScrollingDirection = Enum.ScrollingDirection.Y
+			scroller.ScrollBarThickness = 3
+			scroller.ScrollBarImageColor3 = scheme.OutlineColor
+			scroller.ElasticBehavior = Enum.ElasticBehavior.Never
+
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 4)
+			corner.Parent = scroller
+
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = scheme.OutlineColor
+			stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			stroke.Parent = scroller
+
+			local padding = Instance.new("UIPadding")
+			padding.PaddingTop = UDim.new(0, 6)
+			padding.PaddingBottom = UDim.new(0, 6)
+			padding.PaddingLeft = UDim.new(0, 8)
+			padding.PaddingRight = UDim.new(0, 8)
+			padding.Parent = scroller
+
+			local body = Instance.new("TextLabel")
+			body.BackgroundTransparency = 1
+			body.Size = UDim2.new(1, -6, 0, 0)
+			body.AutomaticSize = Enum.AutomaticSize.Y
+			body.FontFace = scheme.Font
+			body.TextSize = 14
+			body.TextColor3 = scheme.FontColor
+			body.TextWrapped = true
+			body.RichText = false
+			body.TextXAlignment = Enum.TextXAlignment.Left
+			body.TextYAlignment = Enum.TextYAlignment.Top
+			body.Text = table.concat(lines, "\n")
+			body.Parent = scroller
+
+			scroller.Parent = tab.Container
+			pcall(function() tab:Resize() end)
+		end
+
+		local ChangelogGroup = tbl15.Home:AddLeftGroupbox("<b>Changelog</b>", "scroll-text")
+		ChangelogGroup:AddLabel({ Text = ("<b>%s</b>"):format(Changelog.Version), DoesWrap = true, Size = 16 })
+		local ChangelogBox = ChangelogGroup:AddTabbox({ PopOut = false })
+		addChangelogTab(ChangelogBox, "Added", "plus", Changelog.Added)
+		addChangelogTab(ChangelogBox, "Changed", "refresh-cw", Changelog.Changed)
+		addChangelogTab(ChangelogBox, "Fixed", "wrench", Changelog.Fixed)
+		end
+
+		local OverviewGroup = tbl15.Home:AddRightGroupbox("<b>Overview</b>", "chart-line")
+		local HomeBox = OverviewGroup:AddTabbox({ PopOut = false })
 
 		do
-			local Statistics = tbl15.Home:AddRightGroupbox("<b>Statistics</b>", "blinds", nil, nil, nil, "Info")
+			local Statistics = HomeBox:AddTab("Session", "clock")
 			pcall(function()
 				Statistics:SetDescription("Info")
 			end)
-			Statistics:AddLabel("CurrentTime", { Text = "Current time: <b>--:--</b>", DoesWrap = true })
-			Statistics:AddLabel("VerLabel", { Text = "Current script version: <b>HuiG Custom V1.2</b>", DoesWrap = true })
-			local _fpsLbl = Statistics:AddLabel("FPSLabel", { Text = "FPS: <b>--</b>", DoesWrap = true })
-			local _pingLbl = Statistics:AddLabel("PingLabel", { Text = "Ping: <b>-- ms</b>", DoesWrap = true })
-			getgenv()._HomeLblFPS = _fpsLbl
-			getgenv()._HomeLblPing = _pingLbl
-			Statistics:AddDivider()
-			Statistics:AddLabel("PlayersLabel", { Text = "Players in server: <b>--</b>", DoesWrap = true })
-			Statistics:AddLabel("SpentTime", { Text = "Elapsed time: <b>0 seconds</b>", DoesWrap = true })
+			pcall(function()
+				Statistics:AddImage("GameBanner", {
+					Image = ("rbxthumb://type=GameIcon&id=%d&w=512&h=512"):format(game.GameId),
+					Height = 110,
+					Color = Color3.new(1, 1, 1),
+					Transparency = 0,
+					BackgroundTransparency = 1,
+					ScaleType = Enum.ScaleType.Crop,
+				})
+			end)
+			local gameNameLbl = Statistics:AddLabel("GameName", { Text = "<b>" .. tostring(game.Name) .. "</b>", DoesWrap = true })
+			task.spawn(function()
+				local ok, info = pcall(function()
+					return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
+				end)
+				if ok and type(info) == "table" and type(info.Name) == "string" and not lib.Unloaded then
+					local safeName = info.Name:gsub("<", "&lt;")
+					pcall(function() gameNameLbl:SetText("<b>" .. safeName .. "</b>") end)
+				end
+			end)
+			Statistics:AddLabel("VerLabel", { Text = "Build: <b>V1.3</b>", DoesWrap = true })
+			Statistics:AddDivider("This Session")
+			Statistics:AddLabel("CurrentTime", { Text = "Local time: <b>--:--</b>", DoesWrap = true })
+			Statistics:AddLabel("SpentTime", { Text = "Session time: <b>0m 0s</b>", DoesWrap = true })
+			Statistics:AddLabel("PlayersLabel", { Text = "Server players: <b>--</b>", DoesWrap = true })
+			Statistics:AddLabel("TogglesCurrentlyOn", { Text = "Enabled toggles: <b>0</b>", DoesWrap = true })
 			Statistics:AddLabel("LabelHi", { Text = "Kicked players: <b>0</b>", DoesWrap = true })
 
+			local Usage = HomeBox:AddTab("Usage", "chart-bar")
+			local _fpsLbl = Usage:AddLabel("FPSLabel", { Text = "FPS: <b>--</b>", DoesWrap = true })
+			local _pingLbl = Usage:AddLabel("PingLabel", { Text = "Ping: <b>-- ms</b>", DoesWrap = true })
+			getgenv()._HomeLblFPS = _fpsLbl
+			getgenv()._HomeLblPing = _pingLbl
+
+			task.spawn(function()
+				while task.wait(1) and not lib.Unloaded do
+					pcall(function()
+						local playersLabel = lib.Labels.PlayersLabel
+						if playersLabel then
+							playersLabel:SetText(("Server players: <b>%d / %d</b>"):format(#Players:GetPlayers(), Players.MaxPlayers))
+						end
+					end)
+				end
+			end)
 			-- Savitar-style live FPS / Ping
 			task.spawn(function()
 				local frames = 0
@@ -38345,7 +38808,7 @@ Escape Timer: %*]]
 			if lib.Labels.TogglesCurrentlyOn then
 				local togglesCurrentlyOn = lib.Labels.TogglesCurrentlyOn
 				local setText = togglesCurrentlyOn.SetText
-				local str5 = ("Toggles currently on: <b>%*</b>"):format(n36)
+				local str5 = ("Enabled toggles: <b>%*</b>"):format(n36)
 				setText(togglesCurrentlyOn, str5)
 			end
 		end
@@ -38366,7 +38829,7 @@ Escape Timer: %*]]
 				if v25 ~= v22 then
 					local currentTime = lib.Labels.CurrentTime
 					local setText = currentTime.SetText
-					local str5 = ("Current time: <b>%*</b>"):format(v25)
+					local str5 = ("Local time: <b>%*</b>"):format(v25)
 					setText(currentTime, str5)
 					v22 = v25
 				end
@@ -38382,7 +38845,7 @@ Escape Timer: %*]]
 				if n36 ~= v24 then
 					local spentTime = lib.Labels.SpentTime
 					local setText = spentTime.SetText
-					local str5 = ("Elapsed time: <b>%* seconds</b>"):format(n36)
+					local str5 = ("Session time: <b>%*m %*s</b>"):format(math.floor(n36 / 60), n36 % 60)
 					setText(spentTime, str5)
 					v24 = n36
 				end
@@ -38390,7 +38853,9 @@ Escape Timer: %*]]
 		end)
 
 		do
-			local Script = tbl15.Home:AddRightGroupbox("<b>Script</b>", "code-xml", nil, nil, nil, "Script Functions")
+			local ServerGroup = tbl15.Home:AddRightGroupbox("<b>Server</b>", "server")
+			local ServerBox = ServerGroup:AddTabbox({ PopOut = false })
+			local Script = ServerBox:AddTab("Actions", "zap")
 			pcall(function()
 				Script:SetDescription("Script Functions")
 			end)
@@ -38461,9 +38926,11 @@ Escape Timer: %*]]
 				end,
 			})
 
-			Script:AddDivider("Server-Hop Settings")
+			local ServerHop = ServerBox:AddTab("Server-hop", "shuffle")
 
-			Script:AddDropdown("ServerHopRegion", {
+			ServerHop:AddDivider("Settings")
+
+			ServerHop:AddDropdown("ServerHopRegion", {
 				Values = tbl7.ServerHop.RegionNames,
 				Default = 1,
 				Multi = false,
@@ -38475,7 +38942,7 @@ Escape Timer: %*]]
 				end,
 			})
 
-			Script:AddDropdown("ServerHopSort", {
+			ServerHop:AddDropdown("ServerHopSort", {
 				Values = {
 					"Closest Datacenter",
 					"Lowest Players",
@@ -38491,7 +38958,7 @@ Escape Timer: %*]]
 				end,
 			})
 
-			Script:AddSlider("ServerHopMinPlayers", {
+			ServerHop:AddSlider("ServerHopMinPlayers", {
 				Text = "Minimum Players",
 				Default = 0,
 				Min = 0,
@@ -38503,7 +38970,7 @@ Escape Timer: %*]]
 				end,
 			})
 
-			Script:AddSlider("ServerHopMaxPlayers", {
+			ServerHop:AddSlider("ServerHopMaxPlayers", {
 				Text = "Maximum Players",
 				Default = Players.MaxPlayers,
 				Min = 0,
@@ -38515,9 +38982,9 @@ Escape Timer: %*]]
 				end,
 			})
 
-			Script:AddDivider("Server-Hop Timer")
+			ServerHop:AddDivider("Server-Hop Timer")
 
-			Script:AddSlider("AutoServerHopTime", {
+			ServerHop:AddSlider("AutoServerHopTime", {
 				Text = "Server-hop after",
 				Default = 30,
 				Min = 1,
@@ -38534,7 +39001,7 @@ Escape Timer: %*]]
 				end,
 			})
 
-			Script:AddToggle("AutoServerHop", {
+			ServerHop:AddToggle("AutoServerHop", {
 				Text = "Auto Server-Hop",
 				Tooltip = "Automatically server-hops after the selected time",
 				Callback = function(autoServerHop)
@@ -38729,6 +39196,52 @@ Escape Timer: %*]]
 					v26:Stop()
 				end,
 			}):AddKeyPicker("JerkOffK", { Text = "Jerk Off", Mode = "Toggle", NoUI = false, SyncToggleState = true })
+
+			Character:AddToggle("BangOffT", {
+				Text = "Bang-off",
+				Default = false,
+				Callback = function(bangOff)
+					tbl8.BangOff = bangOff
+					local v22, v23, v24 = tbl12.Char()
+					local v25 = v24
+					if not v25 then return end
+					local animation = Instance.new("Animation")
+					animation.Name = "BangOff"
+					local animator = v25:WaitForChild("Animator", 2)
+					if not animator then return end
+					animation.AnimationId = "rbxassetid://148840371"
+					local v26 = animator:LoadAnimation(animation)
+					v26.Priority = Enum.AnimationPriority.Action
+					v26:Play()
+					v26:AdjustSpeed(10)
+
+					while task.wait(0.1) and tbl8.BangOff and not flag11 do
+						if v25.Health == 0 then
+							v26:Stop()
+							local result = localPlayer.CharacterAdded:Wait()
+							while true do
+								task.wait()
+								if not (result:FindFirstChild("Humanoid") and result:FindFirstChild("HumanoidRootPart")) then
+									continue
+								end
+								break
+							end
+							local v27, v28, v29 = tbl12.Char()
+							v25 = v29
+							if not v25 then break end
+							v26 = v25:WaitForChild("Animator", 2):LoadAnimation(animation)
+							v26.Priority = Enum.AnimationPriority.Action
+							v26:Play()
+							v26:AdjustSpeed(10)
+						end
+						if v26 and v26.IsPlaying then
+							v26.TimePosition = 0.1
+						end
+					end
+
+					if v26 then v26:Stop() end
+				end,
+			}):AddKeyPicker("BangOffK", { Text = "Bang-off", Mode = "Toggle", NoUI = false, SyncToggleState = true })
 
 			Character:AddDivider()
 
@@ -40140,6 +40653,123 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
+		Antis:AddToggle("AntiKickItem", {
+			Text = "Anti Kick [Item]",
+			Default = false,
+			Tooltip = "Spooky Candle anti-kick item only (not Clock)",
+			Callback = function(arg)
+				tbl8.AntiKickItem = arg
+				if arg then
+					task.spawn(function()
+						local RS = game:GetService("ReplicatedStorage")
+						local RunService = game:GetService("RunService")
+						local destroyToy = RS:FindFirstChild("MenuToys") and RS.MenuToys:FindFirstChild("DestroyToy")
+						local warpSpeed = 15
+						while tbl8.AntiKickItem and not flag11 do
+							local dt = task.wait()
+							local char = localPlayer.Character
+							local hrp = char and char:FindFirstChild("HumanoidRootPart")
+							local hum = char and char:FindFirstChildOfClass("Humanoid")
+							local inPlot = localPlayer:FindFirstChild("InPlot")
+							local inv = workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
+							if not hrp or not hum or hum.Health <= 0 or not inv then continue end
+							if inPlot and inPlot.Value then continue end
+
+							local Item = inv:FindFirstChild("AntiKickItem")
+							local SoundPart = Item and (Item:FindFirstChild("Hitbox") or Item:FindFirstChild("SoundPart"))
+
+							if not Item or not SoundPart then
+								for _, v in pairs(inv:GetChildren()) do
+									if v.Name == "AntiKickItem" or v.Name == "SpookyCandle1" then
+										pcall(function() if destroyToy then destroyToy:FireServer(v) end end)
+									end
+								end
+								-- spawn SpookyCandle1 only
+								local spawnCF = hrp.CFrame * CFrame.new(0, 14, 20)
+								Item = tbl12.SpawnToy("SpookyCandle1", spawnCF, 3, true)
+								if not Item then continue end
+								SoundPart = Item:FindFirstChild("Hitbox") or Item:WaitForChild("Hitbox", 0.8) or Item:FindFirstChild("SoundPart")
+								if SoundPart then
+									pcall(function() tbl12.SNO(SoundPart) end)
+								end
+								for _, v in pairs(Item:GetDescendants()) do
+									if v:IsA("BasePart") then
+										v.CanCollide = false
+										-- not clickable: mouse / grab raycasts pass through it
+										v.CanQuery = false
+										v.Transparency = 0.8
+										v.Color = Color3.fromRGB(0, 255, 255)
+									elseif v:IsA("ClickDetector") or v:IsA("ProximityPrompt") or v:IsA("DragDetector") then
+										v:Destroy()
+									end
+								end
+								Item.Name = "AntiKickItem"
+							end
+
+							if SoundPart and SoundPart.Parent and hrp then
+								-- stick to PCLD if present, else FirePlayerPart, else HRP (Revenge behavior)
+								local targetPart = nil
+								if tbl12.DetectPCLD then
+									local pcld = tbl12.DetectPCLD(localPlayer)
+									if pcld and pcld.Parent and (not tbl12.IsWaitingPCLD or not tbl12.IsWaitingPCLD(pcld)) then
+										targetPart = pcld
+									end
+								end
+								if not targetPart then
+									targetPart = hrp:FindFirstChild("FirePlayerPart") or hrp
+								end
+								local alpha = 1 - math.exp(-warpSpeed * math.max(dt, 0.001))
+								local targetCFrame = targetPart.CFrame * CFrame.new(0, 0.65, 0.3)
+								SoundPart.CFrame = SoundPart.CFrame:Lerp(targetCFrame, alpha)
+								SoundPart.AssemblyLinearVelocity = Vector3.zero
+								SoundPart.AssemblyAngularVelocity = Vector3.zero
+								if not tbl12.IsPartOwner(SoundPart) then
+									pcall(function() tbl12.SNO(SoundPart) end)
+								end
+							end
+
+							-- Hide the candle for you while you're in first person.
+							if Item and Item.Parent then
+								local camera = workspace.CurrentCamera
+								local head = char:FindFirstChild("Head")
+								local firstPerson = camera and head and (camera.CFrame.Position - head.Position).Magnitude < 1.5
+								local modifier = firstPerson and 1 or 0
+								for _, v in ipairs(Item:GetDescendants()) do
+									if v:IsA("BasePart") then
+										v.CanQuery = false
+										if v.LocalTransparencyModifier ~= modifier then
+											v.LocalTransparencyModifier = modifier
+										end
+									end
+								end
+							end
+						end
+						local inv2 = workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
+						if inv2 and destroyToy then
+							for _, v in pairs(inv2:GetChildren()) do
+								if v.Name == "AntiKickItem" then
+									pcall(function() destroyToy:FireServer(v) end)
+								end
+							end
+						end
+					end)
+				else
+					task.spawn(function()
+						local inv = workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
+						local destroyToy = game:GetService("ReplicatedStorage"):FindFirstChild("MenuToys")
+						destroyToy = destroyToy and destroyToy:FindFirstChild("DestroyToy")
+						if inv and destroyToy then
+							for _, v in pairs(inv:GetChildren()) do
+								if v.Name == "AntiKickItem" then
+									pcall(function() destroyToy:FireServer(v) end)
+								end
+							end
+						end
+					end)
+				end
+			end,
+		})
+
 		Antis:AddToggle("AntiKick2", {
 			Text = "[Break PCLD] Anti Kick",
 			Default = false,
@@ -40424,7 +41054,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				if destroyVoid then
 					workspace.FallenPartsDestroyHeight = (0/0)
 				else
-					workspace.FallenPartsDestroyHeight = -100
+					workspace.FallenPartsDestroyHeight = getgenv().ResonanceOriginalFallenHeight or -500
 				end
 			end,
 		})
@@ -40577,31 +41207,23 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 	do
 		local Config = tbl15.Invincibility:AddRightGroupbox("Config", "settings")
 
-		Config:AddSlider("AntiLagSens", {
-			Text = "Auto Anti-Lag Sensitivity",
-			Default = 3,
-			Min = 1,
-			Max = 20,
-			Suffix = " FPS",
-			Callback = function(antiLagSens)
-				tbl9.AntiLagSens = antiLagSens
-			end,
+		-- One category at a time, like the Anti-Kick tabs below.
+		Config:AddDropdown("InvConfigCategory", {
+			Values = { "Anti-Grab", "Anti Net-Owner", "Anti-Lag", "Auto Reset" },
+			ValueImages = {
+				["Anti-Grab"] = "hand",
+				["Anti Net-Owner"] = "wifi-off",
+				["Anti-Lag"] = "gauge",
+				["Auto Reset"] = "rotate-cw",
+			},
+			Default = 1,
+			Multi = false,
+			Text = "Category",
 		})
 
-		Config:AddDivider("Auto Reset")
-
-		Config:AddToggle("AutoLeave", {
-			Text = "Auto Leave",
-			Default = true,
-			Tooltip = "Leaves after four detected kick flags instead of continuing to reset",
-			Callback = function(autoLeave)
-				tbl8.AutoLeave = autoLeave
-			end,
-		})
-
-		Config:AddDivider("Anti-Grabs")
-
-		Config:AddDropdown("AGTDropdown", {
+		local antiGrabBox = Config:AddDependencyBox()
+		antiGrabBox:SetupDependencies({ { options.InvConfigCategory, "Anti-Grab" } })
+		antiGrabBox:AddDropdown("AGTDropdown", {
 			Values = { "Normal", "No Ragdoll", "Anti-Kill", "Escapes Anything, but buggy" },
 			Default = 1,
 			Multi = false,
@@ -40612,7 +41234,9 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		Config:AddDropdown("GTDropdown", {
+		antiGrabBox:AddDivider("Gucci")
+
+		antiGrabBox:AddDropdown("GTDropdown", {
 			Values = { "Blobman", "Tractor [Invisible]", "Train [Invisible]", "Sleigh [Invisible]" },
 			ValueImages = {
 				["Blobman"] = "rbxassetid://121397196237272",
@@ -40622,7 +41246,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			},
 			Default = 1,
 			Multi = false,
-			Text = "GUCCI Type",
+			Text = "Vehicle",
 			Tooltip = "What vehicle will you sit on during Gucci Anti Grab",
 			Callback = function(arg)
 				if arg == "Blobman" then
@@ -40637,9 +41261,9 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		Config:AddDivider("Anti Net-Owner")
-
-		Config:AddDropdown("AITDropdown", {
+		local netOwnerBox = Config:AddDependencyBox()
+		netOwnerBox:SetupDependencies({ { options.InvConfigCategory, "Anti Net-Owner" } })
+		netOwnerBox:AddDropdown("AITDropdown", {
 			Values = {
 				"FoodHamburger",
 				"InstrumentDrumBongos",
@@ -40711,7 +41335,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		Config:AddSlider("AntiInpLagDel", {
+		netOwnerBox:AddSlider("AntiInpLagDel", {
 			Text = "Grab & Drop Delay",
 			Default = 0.05,
 			Min = 0,
@@ -40723,9 +41347,9 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		Config:AddLabel("Below 0.05 can cause high ping")
+		netOwnerBox:AddLabel("Below 0.05 can cause high ping")
 
-		Config:AddSlider("ItemTransAK", {
+		netOwnerBox:AddSlider("ItemTransAK", {
 			Text = "Item Transparency",
 			Default = tbl9.AILTransparency,
 			Min = 0,
@@ -40736,10 +41360,100 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		Config:AddDivider("Anti-Kick")
-		local antiKickSettings = tbl7.AntiKickSettings
+		local antiLagBox = Config:AddDependencyBox()
+		antiLagBox:SetupDependencies({ { options.InvConfigCategory, "Anti-Lag" } })
+		antiLagBox:AddSlider("AntiLagSens", {
+			Text = "Auto Anti-Lag Sensitivity",
+			Default = 3,
+			Min = 1,
+			Max = 20,
+			Suffix = " FPS",
+			Callback = function(antiLagSens)
+				tbl9.AntiLagSens = antiLagSens
+			end,
+		})
 
-		Config:AddDropdown("AKTypeDropdown", {
+		local autoResetBox = Config:AddDependencyBox()
+		autoResetBox:SetupDependencies({ { options.InvConfigCategory, "Auto Reset" } })
+		autoResetBox:AddToggle("AutoLeave", {
+			Text = "Auto Leave",
+			Default = true,
+			Tooltip = "Leaves after four detected kick flags instead of continuing to reset",
+			Callback = function(autoLeave)
+				tbl8.AutoLeave = autoLeave
+			end,
+		})
+	end
+
+	do
+		local antiKickSettings = tbl7.AntiKickSettings
+		local AntiKickGroup = tbl15.Invincibility:AddRightGroupbox("Anti-Kick", "shield-check")
+		local antiKickTabs = AntiKickGroup:AddTabbox({ PopOut = false })
+		local akHighlight = antiKickTabs:AddTab("Highlight", "highlighter")
+		local akItems = antiKickTabs:AddTab("Items", "package")
+
+		local AntiKickHL = akHighlight:AddToggle("AntiKickHL", {
+			Text = "Highlight",
+			Default = antiKickSettings.Highlight,
+			Tooltip = "Highlights the active anti-kick item",
+			Callback = function(highlight)
+				antiKickSettings.Highlight = highlight
+			end,
+		})
+
+		AntiKickHL:AddColorPicker("AKFill", {
+			Default = antiKickSettings.HighlightFill,
+			Title = "Fill Color",
+			Callback = function(highlightFill)
+				antiKickSettings.HighlightFill = highlightFill
+			end,
+		})
+
+		AntiKickHL:AddColorPicker("AKOutline", {
+			Default = antiKickSettings.HighlightOutl,
+			Title = "Outline Color",
+			Callback = function(highlightOutl)
+				antiKickSettings.HighlightOutl = highlightOutl
+			end,
+		})
+
+		tbl12.AddRainbowToggle(akHighlight, "RGBAKFill", "RGB Fill", "AKFill")
+		tbl12.AddRainbowToggle(akHighlight, "RGBAKOutline", "RGB Outline", "AKOutline")
+
+		akHighlight:AddSlider("FillTransAK", {
+			Text = "Fill Transparency",
+			Default = antiKickSettings.HighlightFT,
+			Min = 0,
+			Max = 1,
+			Rounding = 2,
+			Callback = function(highlightFT)
+				antiKickSettings.HighlightFT = highlightFT
+			end,
+		})
+
+		akHighlight:AddSlider("OutlTransAK", {
+			Text = "Outline Transparency",
+			Default = antiKickSettings.HighlightOT,
+			Min = 0,
+			Max = 1,
+			Rounding = 2,
+			Callback = function(highlightOT)
+				antiKickSettings.HighlightOT = highlightOT
+			end,
+		})
+
+		akHighlight:AddSlider("ShurTransAK", {
+			Text = "Toy Transparency",
+			Default = antiKickSettings.Transparency,
+			Min = 0,
+			Max = 1,
+			Rounding = 2,
+			Callback = function(transparency)
+				antiKickSettings.Transparency = transparency
+			end,
+		})
+
+		akItems:AddDropdown("AKTypeDropdown", {
 			Values = { "Shuriken", "Katana On Back", "Pencil Dih" },
 			Default = tbl9.AKTypes or { Shuriken = true },
 			Multi = true,
@@ -40786,7 +41500,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		local donutBeastBox = Config:AddDependencyBox()
+		local donutBeastBox = akItems:AddDependencyBox()
 		donutBeastBox:SetupDependencies({ { options.AKTypeDropdown, "Pencil Dih" } })
 		donutBeastBox:AddToggle("DonutBeast", {
 			Text = "Donut Beast",
@@ -40799,67 +41513,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					akDonut = nil
 					akDonutRoot = nil
 				end
-			end,
-		})
-
-		local AntiKickHL = Config:AddToggle("AntiKickHL", {
-			Text = "Highlight",
-			Default = antiKickSettings.Highlight,
-			Tooltip = "Highlights the active anti-kick item",
-			Callback = function(highlight)
-				antiKickSettings.Highlight = highlight
-			end,
-		})
-
-		AntiKickHL:AddColorPicker("AKFill", {
-			Default = antiKickSettings.HighlightFill,
-			Title = "Fill Color",
-			Callback = function(highlightFill)
-				antiKickSettings.HighlightFill = highlightFill
-			end,
-		})
-
-		AntiKickHL:AddColorPicker("AKOutline", {
-			Default = antiKickSettings.HighlightOutl,
-			Title = "Outline Color",
-			Callback = function(highlightOutl)
-				antiKickSettings.HighlightOutl = highlightOutl
-			end,
-		})
-
-		tbl12.AddRainbowToggle(Config, "RGBAKFill", "RGB Fill", "AKFill")
-		tbl12.AddRainbowToggle(Config, "RGBAKOutline", "RGB Outline", "AKOutline")
-
-		Config:AddSlider("FillTransAK", {
-			Text = "Fill Transparency",
-			Default = antiKickSettings.HighlightFT,
-			Min = 0,
-			Max = 1,
-			Rounding = 2,
-			Callback = function(highlightFT)
-				antiKickSettings.HighlightFT = highlightFT
-			end,
-		})
-
-		Config:AddSlider("OutlTransAK", {
-			Text = "Outline Transparency",
-			Default = antiKickSettings.HighlightOT,
-			Min = 0,
-			Max = 1,
-			Rounding = 2,
-			Callback = function(highlightOT)
-				antiKickSettings.HighlightOT = highlightOT
-			end,
-		})
-
-		Config:AddSlider("ShurTransAK", {
-			Text = "Item Transparency",
-			Default = antiKickSettings.Transparency,
-			Min = 0,
-			Max = 1,
-			Rounding = 2,
-			Callback = function(transparency)
-				antiKickSettings.Transparency = transparency
 			end,
 		})
 	end
@@ -40890,6 +41543,16 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				"Remove Gucci",
 				"Remove Invisibility",
 				"Delete Seatables",
+			},
+			ValueImages = {
+				Kick = "user-round-x",
+				Void = "circle-dashed",
+				Kill = "skull",
+				Bring = "magnet",
+				["Destroy Food"] = "utensils-crossed",
+				["Remove Gucci"] = "circle-off",
+				["Remove Invisibility"] = "eye-off",
+				["Delete Seatables"] = "armchair",
 			},
 			Multi = true,
 			AllowNull = true,
@@ -41587,13 +42250,26 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 	end
 
 	do
-		local Settings = tbl15.Blobman:AddRightGroupbox("Settings", "settings")
+		tbl7.BlobmanTabbox = tbl15.Blobman:AddRightTabbox()
+		local Settings = tbl7.BlobmanTabbox:AddTab("Controls", "armchair")
 
 		Settings:AddToggle("AutoSeatBlobman", {
 			Text = "Auto Sit Blobman",
 			Default = false,
 			Callback = function(autoSeatBlobman)
 				tbl8.AutoSeatBlobman = autoSeatBlobman
+
+				if not autoSeatBlobman and toggles.AutoRemoveBlobman and toggles.AutoRemoveBlobman.Value then
+					-- Short delay so a Sit() that is still running can't respawn it right after.
+					task.delay(0.2, function()
+						if tbl8.AutoSeatBlobman or flag11 then return end
+						for _, child in ipairs(v17:GetChildren()) do
+							if child.Name == "CreatureBlobman" then
+								pcall(tbl12.DestroyToy, child)
+							end
+						end
+					end)
+				end
 
 				task.spawn(function()
 					while tbl8.AutoSeatBlobman and task.wait(0.1) do
@@ -41613,10 +42289,68 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 	end
 
 	do
+		local BlobSettings = tbl7.BlobmanTabbox:AddTab("Settings", "settings")
+
+		local function hasBlobTarget()
+			for player in pairs(tbl7.SelectedPlayersBlob) do
+				if typeof(player) == "Instance" and player.Parent == Players then
+					return true
+				end
+			end
+			return false
+		end
+
+		BlobSettings:AddToggle("AutoSitFollowsTarget", {
+			Text = "Auto Sit follows target",
+			Default = false,
+			Tooltip = "Auto Sit Blobman follows your Blobman target: on when you have a target, off when it leaves or gets kicked.",
+		})
+		BlobSettings:AddToggle("AutoRemoveBlobman", {
+			Text = "Remove Blobman when Auto Sit is off",
+			Default = false,
+			Tooltip = "Deletes your Blobman whenever Auto Sit Blobman gets turned off (by you or by 'Auto Sit follows target').",
+		})
+
+		task.spawn(function()
+			local hadTarget = hasBlobTarget()
+			local wasFollowing = false
+			while not flag11 and task.wait(0.25) do
+				local follow = toggles.AutoSitFollowsTarget
+				local autoSit = toggles.AutoSeatBlobman
+				if follow and autoSit then
+					local hasTarget = hasBlobTarget()
+					if follow.Value then
+						if not wasFollowing then
+							-- Just switched on: match the current target right away.
+							if autoSit.Value ~= hasTarget then
+								autoSit:SetValue(hasTarget)
+							end
+						elseif hasTarget and not hadTarget and not autoSit.Value then
+							autoSit:SetValue(true)
+						elseif hadTarget and not hasTarget and autoSit.Value then
+							autoSit:SetValue(false)
+						end
+					end
+					wasFollowing = follow.Value
+					hadTarget = hasTarget
+				end
+			end
+		end)
+	end
+
+	do
 		local v20 = tbl15.Blobman:AddRightGroupbox("Method Settings", "apple")
 
 		v20:AddDropdown("MethodSettingsBlobs", {
 			Values = { "Kick", "Kill", "Bring", "Lock", "Follow", "Remove Gucci" },
+			ValueImages = {
+				Kick = "user-round-x",
+				Kill = "skull",
+				Bring = "magnet",
+				Lock = "lock",
+				Follow = "footprints",
+				["Remove Gucci"] = "circle-off",
+			},
 			Default = 1,
 			Multi = false,
 			Text = "Blobman Method",
@@ -41915,7 +42649,12 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 	end
 
 	do
-		local v20 = tbl15.Toys:AddLeftGroupbox("Toys Aura", "tornado")
+		local toysAuraTabs = tbl15.Toys:AddLeftGroupbox("Toys Aura", "tornado"):AddTabbox({ PopOut = false })
+		local toysAuraMain = toysAuraTabs:AddTab("Main", "hand-grab")
+		local toysAuraShape = toysAuraTabs:AddTab("Shape", "shapes")
+		local toysAuraPosition = toysAuraTabs:AddTab("Position", "move-3d")
+		-- fn21 / fn22 add to whatever v20 is at call time, so v20 is switched per tab below.
+		local v20 = toysAuraMain
 		local toysAuraSettings = tbl7.ToysAuraSettings
 
 		local function fn21(arg, arg2, arg3)
@@ -41995,6 +42734,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 
 		fn21("ToggleToysAura", "Enabled", "Enabled")
 
+		v20 = toysAuraShape
 		v20:AddDropdown("ShapesDropdown", {
 			Values = tbl13.ShapeNames,
 			Default = table.find(tbl13.ShapeNames, toysAuraSettings.Shape) or 1,
@@ -42006,6 +42746,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
+		v20 = toysAuraMain
 		v20:AddDivider("Grabbing")
 
 		v20:AddDropdown("GrabTypeDropdown", {
@@ -42097,6 +42838,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 		})
 
 		fn21("ToysAuraFaceCenter", "Face Center", "FaceCenter")
+		v20 = toysAuraShape
 		v20:AddDivider("Shape Movement")
 		fn21("AutoMoveTA", "Auto Move", "AutoMove")
 		fn22("AutoMoveSp", "Move Speed", "MoveSpeed", 0.1, 25, 1)
@@ -42111,7 +42853,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 		fn22("ToysAuraSpread", "Spread", "Spacing", 0.25, 3, 2)
 		fn22("ToysAuraRows", "Rows", "Rows", 1, 20, 0)
 		fn22("ToysAuraRotations", "Turns", "Rotations", 0, 12, 1)
-		v20:AddDivider("Position")
+		v20 = toysAuraPosition
 
 		v20:AddDropdown("PositionTypeDropdown", {
 			Values = { "You", "Players", "Custom Pos" },
@@ -42229,7 +42971,12 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 
 	do
 		local anchorSettings = tbl7.AnchorSettings
-		local v20 = tbl15.Toys:AddLeftGroupbox("Anchor System", "anchor")
+		local anchorTabs = tbl15.Toys:AddLeftGroupbox("Anchor System", "anchor"):AddTabbox({ PopOut = false })
+		local anchorMain = anchorTabs:AddTab("Main", "anchor")
+		local anchorBuilds = anchorTabs:AddTab("Builds", "save")
+		local anchorShare = anchorTabs:AddTab("Share", "share-2")
+		-- v20 is switched to each tab where its controls start.
+		local v20 = anchorMain
 
 		v20:AddLabel("Fill Color"):AddColorPicker("AnchorFill", {
 			Default = anchorSettings.FillColor,
@@ -42255,6 +43002,24 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				tbl12.ClearAnchors()
 			end,
 		}):AddKeyPicker("ReleaseAll", { Text = "Release All", Mode = "Press", NoUI = true })
+
+		v20:AddToggle("AnchorGrabNotify", {
+			Text = "Notify on Anchor Grab",
+			Default = false,
+			Tooltip = "Notifies when someone (not on Anchor Whitelist) grabs your anchored parts. Repeat grabs update the same notify (x2, x3...).",
+			Callback = function(v)
+				tbl8.AnchorGrabNotify = v
+				if not v then
+					-- dismiss active grab alerts
+					for _, state in pairs(tbl7.AnchorGrabAlerts or {}) do
+						if state.Note then
+							pcall(function() state.Note:Destroy() end)
+						end
+					end
+					tbl7.AnchorGrabAlerts = {}
+				end
+			end,
+		})
 
             -- ==========================================================
     --  Anchor Builds — Save / Load / Delete
@@ -43039,7 +43804,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
         end
 
         -- ---------------- UI ----------------
-        v20:AddDivider("Save / Load Builds")
+        v20 = anchorBuilds
 
         local saveList = v20:AddDropdown("AnchorBuildList", {
             Text = "Saved Builds",
@@ -43189,7 +43954,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
             end,
         })
 
-        v20:AddDivider("Share Build Code")
+        v20 = anchorShare
 
         v20:AddButton({
             Text = "Export Code (Clipboard)",
@@ -43415,8 +44180,10 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 	end
 
 	do
-		local Experimental = tbl15.Toys:AddRightGroupbox("Experimental", "flask-conical")
-		Experimental:AddDivider("Anchored Parts")
+		local experimentalTabs = tbl15.Toys:AddRightGroupbox("Experimental", "flask-conical"):AddTabbox({ PopOut = false })
+		local Experimental = experimentalTabs:AddTab("Anchored", "anchor")
+		local experimentalFlying = experimentalTabs:AddTab("Flying", "plane")
+		local experimentalMisc = experimentalTabs:AddTab("Misc", "ellipsis")
 		local n36 = 1
 		local enabled = false
 		local n37 = 0
@@ -43586,7 +44353,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 		})
 
 		Experimental:AddLabel("Fix part: delete the shuriken that was spawned from your inventory!", true)
-		Experimental:AddDivider("Flying Parts")
+		Experimental = experimentalFlying
 
 		Experimental:AddDropdown("WhichToBreak", {
 			Values = {
@@ -43636,7 +44403,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		Experimental:AddDivider("Misc")
+		Experimental = experimentalMisc
 		Experimental:AddButton({ Text = "Destroy Train", Func = tbl12.DestroyTrain })
 
 		local tsunamiButton = Experimental:AddButton({
@@ -44180,13 +44947,15 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				if not (pencil and sticky and target) then
 					return false
 				end
-				-- no network ownership; still align + fire + retry
-				for _ = 1, 30 do
+				-- Grab 10-15x first (~0.2s) so we own it, then stick once.
+				tbl12.OwnershipBurst({ sound or sticky }, true)
+				fireSticky(sticky, target, cf)
+				-- Only wait for the weld now; the stick is not fired again.
+				local startedAt = os.clock()
+				while os.clock() - startedAt < 1.5 do
 					if not (pencil.Parent and sticky.Parent and target.Parent) then
 						return false
 					end
-					align(pencil, sticky, target, cf)
-					fireSticky(sticky, target, cf)
 					if isStuck(sticky, target) then
 						pcall(function()
 							for _, ch in ipairs(sticky:GetChildren()) do
@@ -44396,6 +45165,48 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
+		-- Protected toys: Gucci, Anti Kick (all styles), Anti Kick Item, Donut Beast, Anti Network Ownership
+		local function isProtectedToy(model)
+			if not model or not model:IsA("Model") then return true end
+			local n = model.Name
+			-- Gucci anti-grab vehicle
+			if n == "GucciRSC" or model:FindFirstChild("GucciBP") then
+				return true
+			end
+			-- Anti Kick styles (shuriken / katana / pencil)
+			if n == "ShurikenRSC" or n == "KatanaAntiKickRSC" or n == "PencilAntiKickRSC" then
+				return true
+			end
+			-- Anti Kick [Item] (Spooky Candle)
+			if n == "AntiKickItem" then
+				return true
+			end
+			-- Donut Beast
+			if n == "DonutBeastRSC" then
+				return true
+			end
+			if v18 and model == v18 then
+				return true
+			end
+			-- Anti Network Ownership (held AntiInputType food/tool)
+			if tbl8.AntiInputLag and n == tostring(tbl9.AntiInputType or "") then
+				return true
+			end
+			-- also protect if currently gripped by local character for AIL
+			if tbl8.AntiInputLag then
+				local hold = model:FindFirstChild("HoldPart")
+				local rc = hold and hold:FindFirstChild("RigidConstraint")
+				if rc and rc.Attachment1 then
+					local att = rc.Attachment1
+					local char = localPlayer.Character
+					if char and att:IsDescendantOf(char) then
+						return true
+					end
+				end
+			end
+			return false
+		end
+
 		Misc:AddButton({
 			Text = "Destroy All Toys",
 			Func = function()
@@ -44407,7 +45218,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 
 				for _, inventory in pairs(tbl7.Inventories) do
 					for _, child in pairs(inventory:GetChildren()) do
-						if child:IsA("Model") then
+						if child:IsA("Model") and not isProtectedToy(child) then
 							tbl16[#tbl16 + 1] = child
 						end
 					end
@@ -44440,40 +45251,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		-- Protected toys: Gucci, Anti Kick, Anti Network Ownership (NOT RagdollRSC)
-		local function isProtectedToy(model)
-			if not model or not model:IsA("Model") then return true end
-			local n = model.Name
-			-- Gucci anti-grab vehicle
-			if n == "GucciRSC" or model:FindFirstChild("GucciBP") then
-				return true
-			end
-			-- Anti Kick (shuriken platform)
-			if n == "ShurikenRSC" then
-				return true
-			end
-			if v18 and model == v18 then
-				return true
-			end
-			-- Anti Network Ownership (held AntiInputType food/tool)
-			if tbl8.AntiInputLag and n == tostring(tbl9.AntiInputType or "") then
-				return true
-			end
-			-- also protect if currently gripped by local character for AIL
-			if tbl8.AntiInputLag then
-				local hold = model:FindFirstChild("HoldPart")
-				local rc = hold and hold:FindFirstChild("RigidConstraint")
-				if rc and rc.Attachment1 then
-					local att = rc.Attachment1
-					local char = localPlayer.Character
-					if char and att:IsDescendantOf(char) then
-						return true
-					end
-				end
-			end
-			return false
-		end
-
 		tbl12.ClearInventoryToys = function()
 			-- ONLY the local player's SpawnedInToys folder (not shop / plot / other inventories)
 			local list = {}
@@ -44504,7 +45281,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 
 		Misc:AddButton({
 			Text = "Clear Inventory (Safe)",
-			Tooltip = "Despawns all your toys including Ragdoll pallet. Keeps Gucci, Anti Kick, Anti Network Ownership.",
+			Tooltip = "Despawns all your toys including Ragdoll pallet. Keeps Gucci, Anti Kick (all), Anti Kick Item, Donut Beast, Anti Network Ownership.",
 			Func = function()
 				local n = tbl12.ClearInventoryToys()
 				fn18(("Cleared %d toy%s"):format(n, n == 1 and "" or "s"), "Clear")
@@ -48726,7 +49503,41 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					return map
 				end
 
-				local assignments = collectAssignments()
+				local scheme = lib.Scheme or {}
+				local cBg = scheme.BackgroundColor or Color3.fromRGB(25, 25, 28)
+				local cMain = scheme.MainColor or Color3.fromRGB(38, 39, 41)
+				local cAccent = scheme.AccentColor or Color3.fromRGB(255, 255, 255)
+				local cOutline = scheme.OutlineColor or Color3.fromRGB(55, 58, 61)
+				local cFont = scheme.FontColor or Color3.fromRGB(255, 255, 255)
+				local cTaken = Color3.fromRGB(235, 87, 87)
+				local fontFace = scheme.Font or Font.fromEnum(Enum.Font.Gotham)
+				local boldFace = Font.new(fontFace.Family, Enum.FontWeight.Bold)
+
+				local function make(className, props, children)
+					local inst = Instance.new(className)
+					for k, v in pairs(props) do inst[k] = v end
+					for _, child in ipairs(children or {}) do child.Parent = inst end
+					return inst
+				end
+				local function corner(r) return make("UICorner", { CornerRadius = UDim.new(0, r) }) end
+				local function stroke(color, transparency) return make("UIStroke", { Color = color, Transparency = transparency or 0, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }) end
+
+				-- Real 75% layout, widths in key units. Every row adds up to 15 units so edges line up.
+				local rows = {
+					{ { "ESC" }, { "F1" }, { "F2" }, { "F3" }, { "F4" }, { "F5" }, { "F6" }, { "F7" }, { "F8" }, { "F9" }, { "F10" }, { "F11" }, { "F12" } },
+					{ { "`" }, { "1" }, { "2" }, { "3" }, { "4" }, { "5" }, { "6" }, { "7" }, { "8" }, { "9" }, { "0" }, { "-" }, { "=" }, { "BACKSPACE", 2 } },
+					{ { "TAB", 1.5 }, { "Q" }, { "W" }, { "E" }, { "R" }, { "T" }, { "Y" }, { "U" }, { "I" }, { "O" }, { "P" }, { "[" }, { "]" }, { "\\", 1.5 } },
+					{ { "CAPS", 1.75 }, { "A" }, { "S" }, { "D" }, { "F" }, { "G" }, { "H" }, { "J" }, { "K" }, { "L" }, { ";" }, { "'" }, { "ENTER", 2.25 } },
+					{ { "SHIFT", 2.25 }, { "Z" }, { "X" }, { "C" }, { "V" }, { "B" }, { "N" }, { "M" }, { "," }, { "." }, { "/" }, { "SHIFT", 1.75 }, { "UP" } },
+					{ { "CTRL", 1.25 }, { "WIN", 1.25 }, { "ALT", 1.25 }, { "SPACE", 6.25 }, { "ALT" }, { "CTRL" }, { "LEFT" }, { "DOWN" }, { "RIGHT" } },
+				}
+				local ARROW_GLYPH = {} -- plain words: arrow glyphs are not in every Roblox font
+
+				local UNIT, KEY_H, GAP, PAD = 44, 40, 4, 16
+				local boardW = 15 * UNIT + 14 * GAP
+				local HEADER_H, INFO_H = 56, 46
+				local frameW = boardW + PAD * 2
+				local frameH = HEADER_H + 6 * KEY_H + 5 * GAP + PAD + INFO_H + PAD
 
 				local gui = Instance.new("ScreenGui")
 				gui.Name = "RSC_KeyMapPreview"
@@ -48741,80 +49552,213 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				if not gui.Parent then gui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 				tbl12._KeyMapGui = gui
 
-				local frame = Instance.new("Frame")
-				frame.Name = "Keyboard"
-				frame.Size = UDim2.fromOffset(900, 430)
-				frame.Position = UDim2.fromScale(0.5, 0.5)
-				frame.AnchorPoint = Vector2.new(0.5, 0.5)
-				frame.BackgroundColor3 = Color3.fromRGB(14, 18, 29)
-				frame.BorderSizePixel = 0
-				frame.Parent = gui
-				local corner = Instance.new("UICorner")
-				corner.CornerRadius = UDim.new(0, 16)
-				corner.Parent = frame
-				local stroke = Instance.new("UIStroke")
-				stroke.Color = Color3.fromRGB(100, 120, 255)
-				stroke.Transparency = 0.18
-				stroke.Thickness = 1.5
-				stroke.Parent = frame
+				local frame = make("Frame", {
+					Name = "Keyboard",
+					Size = UDim2.fromOffset(frameW, frameH),
+					Position = UDim2.fromScale(0.5, 0.5),
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BackgroundColor3 = cBg,
+					BorderSizePixel = 0,
+					Parent = gui,
+				}, { corner(12), stroke(cOutline) })
+				if type(lib.DPIScale) == "number" and lib.DPIScale ~= 1 then
+					make("UIScale", { Scale = lib.DPIScale, Parent = frame })
+				end
 
-				-- title bar (drag handle)
-				local title = Instance.new("TextButton")
-				title.Name = "Title"
-				title.Size = UDim2.new(1, 0, 0, 44)
-				title.BackgroundColor3 = Color3.fromRGB(28, 34, 53)
-				title.BorderSizePixel = 0
-				title.Text = "  KEYBOARD FREE KEYS  ·  QWERTY / 75%"
-				title.TextColor3 = Color3.fromRGB(246, 248, 255)
-				title.TextXAlignment = Enum.TextXAlignment.Left
-				title.Font = Enum.Font.GothamBold
-				title.TextSize = 15
-				title.AutoButtonColor = false
-				title.Parent = frame
-				local titleCorner = Instance.new("UICorner")
-				titleCorner.CornerRadius = UDim.new(0, 16)
-				titleCorner.Parent = title
-				local titleGradient = Instance.new("UIGradient")
-				titleGradient.Color = ColorSequence.new({
-					ColorSequenceKeypoint.new(0, Color3.fromRGB(62, 68, 150)),
-					ColorSequenceKeypoint.new(1, Color3.fromRGB(24, 105, 145)),
+				-- header (drag handle)
+				local header = make("TextButton", {
+					Name = "Header",
+					Size = UDim2.new(1, 0, 0, HEADER_H),
+					BackgroundTransparency = 1,
+					Text = "",
+					AutoButtonColor = false,
+					Parent = frame,
 				})
-				titleGradient.Parent = title
+				make("TextLabel", {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(PAD, 10),
+					Size = UDim2.new(1, -200, 0, 20),
+					FontFace = boldFace,
+					Text = "Free Keys",
+					TextColor3 = cFont,
+					TextSize = 18,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					Parent = header,
+				})
+				local summary = make("TextLabel", {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(PAD, 31),
+					Size = UDim2.new(1, -200, 0, 16),
+					FontFace = fontFace,
+					Text = "",
+					TextColor3 = cFont,
+					TextTransparency = 0.45,
+					TextSize = 13,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					Parent = header,
+				})
+				make("Frame", {
+					BackgroundColor3 = cOutline,
+					BorderSizePixel = 0,
+					Position = UDim2.new(0, 0, 0, HEADER_H - 1),
+					Size = UDim2.new(1, 0, 0, 1),
+					Parent = frame,
+				})
 
-				local subline = Instance.new("TextLabel")
-				subline.Name = "Hint"
-				subline.BackgroundTransparency = 1
-				subline.Position = UDim2.fromOffset(15, 51)
-				subline.Size = UDim2.new(1, -30, 0, 22)
-				subline.Font = Enum.Font.GothamMedium
-				subline.Text = "Green keys are free  •  Red keys are assigned  •  Hover an assigned key for details"
-				subline.TextColor3 = Color3.fromRGB(175, 190, 215)
-				subline.TextSize = 11
-				subline.TextXAlignment = Enum.TextXAlignment.Left
-				subline.ZIndex = 2
-				subline.Parent = frame
+				local function headerButton(text, x, w)
+					local b = make("TextButton", {
+						AnchorPoint = Vector2.new(1, 0),
+						Position = UDim2.new(1, x, 0, 14),
+						Size = UDim2.fromOffset(w, 28),
+						BackgroundColor3 = cMain,
+						BorderSizePixel = 0,
+						AutoButtonColor = true,
+						FontFace = fontFace,
+						Text = text,
+						TextColor3 = cFont,
+						TextSize = 14,
+						Parent = frame,
+					}, { corner(6), stroke(cOutline) })
+					return b
+				end
+				local closeBtn = headerButton("X", -PAD, 28)
+				local refreshBtn = headerButton("Refresh", -PAD - 34, 76)
 
-				local closeBtn = Instance.new("TextButton")
-				closeBtn.Size = UDim2.fromOffset(28, 28)
-				closeBtn.Position = UDim2.new(1, -36, 0, 8)
-				closeBtn.BackgroundColor3 = Color3.fromRGB(180, 55, 75)
-				closeBtn.Text = "X"
-				closeBtn.TextColor3 = Color3.new(1, 1, 1)
-				closeBtn.Font = Enum.Font.GothamBold
-				closeBtn.TextSize = 14
-				closeBtn.BorderSizePixel = 0
-				closeBtn.Parent = frame
-				local closeCorner = Instance.new("UICorner")
-				closeCorner.CornerRadius = UDim.new(0, 9)
-				closeCorner.Parent = closeBtn
+				-- info bar
+				local info = make("Frame", {
+					Position = UDim2.new(0, PAD, 1, -PAD - INFO_H),
+					Size = UDim2.new(1, -PAD * 2, 0, INFO_H),
+					BackgroundColor3 = cMain,
+					BorderSizePixel = 0,
+					Parent = frame,
+				}, { corner(8), stroke(cOutline) })
+				local infoDot = make("Frame", {
+					AnchorPoint = Vector2.new(0, 0.5),
+					Position = UDim2.new(0, 14, 0.5, 0),
+					Size = UDim2.fromOffset(8, 8),
+					BackgroundColor3 = cOutline,
+					BorderSizePixel = 0,
+					Parent = info,
+				}, { corner(4) })
+				local infoText = make("TextLabel", {
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(30, 0),
+					Size = UDim2.new(1, -40, 1, 0),
+					FontFace = fontFace,
+					RichText = true,
+					Text = "",
+					TextColor3 = cFont,
+					TextSize = 13,
+					TextTruncate = Enum.TextTruncate.AtEnd,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					Parent = info,
+				})
+
+				local board = make("Frame", {
+					Name = "Board",
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(PAD, HEADER_H + PAD),
+					Size = UDim2.fromOffset(boardW, 6 * KEY_H + 5 * GAP),
+					Parent = frame,
+				})
+
+				local function escape(s)
+					return (tostring(s):gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
+				end
+				local defaultInfo = ""
+				local function showInfo(keyName, assigned)
+					if not keyName then
+						infoDot.BackgroundColor3 = cOutline
+						infoText.Text = defaultInfo
+						return
+					end
+					if assigned and #assigned > 0 then
+						infoDot.BackgroundColor3 = cTaken
+						local names = {}
+						for _, a in ipairs(assigned) do table.insert(names, escape(a)) end
+						infoText.Text = ("<b>%s</b>  used by  %s"):format(escape(keyName), table.concat(names, ", "))
+					else
+						infoDot.BackgroundColor3 = cAccent
+						infoText.Text = ("<b>%s</b>  is free"):format(escape(keyName))
+					end
+				end
+
+				local function render()
+					board:ClearAllChildren()
+					local assignments = collectAssignments()
+					local total, used = 0, 0
+					for r, row in ipairs(rows) do
+						local x = 0
+						local y = (r - 1) * (KEY_H + GAP)
+						for _, key in ipairs(row) do
+							local label, units = key[1], key[2] or 1
+							local w = units * UNIT + (units - 1) * GAP
+							local assigned = assignments[label]
+							local taken = assigned ~= nil and #assigned > 0
+							total += 1
+							if taken then used += 1 end
+
+							local btn = make("TextButton", {
+								Position = UDim2.fromOffset(x, y),
+								Size = UDim2.fromOffset(w, KEY_H),
+								BackgroundColor3 = taken and cBg or cMain,
+								BorderSizePixel = 0,
+								AutoButtonColor = false,
+								FontFace = taken and fontFace or boldFace,
+								Text = ARROW_GLYPH[label] or label,
+								TextColor3 = taken and cFont or cAccent,
+								TextTransparency = taken and 0.6 or 0,
+								TextSize = (#label > 3 and not ARROW_GLYPH[label]) and 11 or 14,
+								Parent = board,
+							}, { corner(6) })
+							local keyStroke = stroke(taken and cOutline or cAccent, taken and 0 or 0.55)
+							keyStroke.Parent = btn
+
+							if taken then
+								-- small badge: how many things use this key
+								make("TextLabel", {
+									AnchorPoint = Vector2.new(1, 0),
+									Position = UDim2.new(1, -3, 0, 3),
+									Size = UDim2.fromOffset(14, 14),
+									BackgroundColor3 = cTaken,
+									BorderSizePixel = 0,
+									FontFace = boldFace,
+									Text = tostring(#assigned),
+									TextColor3 = Color3.new(1, 1, 1),
+									TextSize = 10,
+									Parent = btn,
+								}, { corner(7) })
+							end
+
+							btn.MouseEnter:Connect(function()
+								keyStroke.Transparency = 0
+								keyStroke.Color = taken and cTaken or cAccent
+								showInfo(label, assigned)
+							end)
+							btn.MouseLeave:Connect(function()
+								keyStroke.Transparency = taken and 0 or 0.55
+								keyStroke.Color = taken and cOutline or cAccent
+								showInfo(nil)
+							end)
+
+							x += w + GAP
+						end
+					end
+					summary.Text = ("%d free  ·  %d in use  ·  %d keys"):format(total - used, used, total)
+					defaultInfo = "Hover a key to see what it does.  Highlighted keys are free."
+					showInfo(nil)
+				end
+				render()
+
+				refreshBtn.MouseButton1Click:Connect(render)
 				closeBtn.MouseButton1Click:Connect(function()
 					gui:Destroy()
 					tbl12._KeyMapGui = nil
 				end)
 
-				-- drag
+				-- drag by the header
 				local dragging, dragStart, startPos
-				title.InputBegan:Connect(function(input)
+				header.InputBegan:Connect(function(input)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 						dragging = true
 						dragStart = input.Position
@@ -48839,144 +49783,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					end
 					if tbl12._KeyMapGui == gui then tbl12._KeyMapGui = nil end
 				end)
-
-				-- tooltip
-				local tip = Instance.new("TextLabel")
-				tip.Name = "Tooltip"
-				tip.BackgroundColor3 = Color3.fromRGB(23, 29, 45)
-				tip.TextColor3 = Color3.fromRGB(255, 255, 255)
-				tip.Font = Enum.Font.GothamMedium
-				tip.TextSize = 12
-				tip.TextWrapped = true
-				tip.Visible = false
-				tip.ZIndex = 10
-				tip.BorderSizePixel = 0
-				tip.Parent = frame
-				local tipCorner = Instance.new("UICorner")
-				tipCorner.CornerRadius = UDim.new(0, 4)
-				tipCorner.Parent = tip
-				local tipStroke = Instance.new("UIStroke")
-				tipStroke.Color = Color3.fromRGB(108, 130, 255)
-				tipStroke.Parent = tip
-
-				-- 75% form + QWERTY labels
-				local rows = {
-					{ "ESC", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12" },
-					{ "`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=", "BACKSPACE" },
-					{ "TAB", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "[", "]", "\\" },
-					{ "CAPS", "A", "S", "D", "F", "G", "H", "J", "K", "L", ";", "'", "ENTER" },
-					{ "SHIFT", "Z", "X", "C", "V", "B", "N", "M", ",", ".", "/", "SHIFT" },
-					{ "CTRL", "WIN", "ALT", "SPACE", "ALT", "CTRL", "LEFT", "DOWN", "UP", "RIGHT" },
-				}
-
-				local keyW, keyH, gap = 50, 36, 5
-				local startY = 91
-
-				local function keyWidth(label)
-					if label == "SPACE" then return keyW * 4 + gap * 3 end
-					if label == "BACKSPACE" or label == "ENTER" or label == "SHIFT" or label == "CAPS" or label == "TAB" then
-						return keyW * 1.55
-					end
-					if label == "CTRL" or label == "ALT" or label == "WIN" then return keyW * 1.25 end
-					if label == "LEFT" or label == "RIGHT" or label == "UP" or label == "DOWN" then return keyW * 0.95 end
-					return keyW
-				end
-
-				for r, row in ipairs(rows) do
-					local x = 10
-					local y = startY + (r - 1) * (keyH + gap)
-					-- center bottom row a bit
-					if r == 6 then x = 80 end
-					for _, label in ipairs(row) do
-						local w = keyWidth(label)
-						local keyName = label:upper()
-						local assigned = assignments[keyName]
-						local isTaken = assigned and #assigned > 0
-
-						local btn = Instance.new("TextButton")
-						btn.Size = UDim2.fromOffset(w, keyH)
-						btn.Position = UDim2.fromOffset(x, y)
-						btn.BackgroundColor3 = isTaken and Color3.fromRGB(112, 42, 67) or Color3.fromRGB(27, 100, 94)
-						btn.Text = label
-						btn.TextColor3 = Color3.new(1, 1, 1)
-						btn.Font = Enum.Font.GothamBold
-						btn.TextSize = (#label > 3) and 10 or 12
-						btn.BorderSizePixel = 0
-						btn.AutoButtonColor = true
-						btn.Parent = frame
-						local kc = Instance.new("UICorner")
-						kc.CornerRadius = UDim.new(0, 7)
-						kc.Parent = btn
-						local keyStroke = Instance.new("UIStroke")
-						keyStroke.Color = isTaken and Color3.fromRGB(240, 105, 132) or Color3.fromRGB(87, 210, 185)
-						keyStroke.Transparency = 0.3
-						keyStroke.Thickness = 1
-						keyStroke.Parent = btn
-
-						if isTaken then
-							btn.MouseEnter:Connect(function()
-								local lines = { keyName .. " assigned to:" }
-								for _, a in ipairs(assigned) do
-									table.insert(lines, "• " .. tostring(a))
-								end
-								tip.Text = table.concat(lines, "\n")
-								tip.Size = UDim2.fromOffset(260, 18 + #assigned * 16)
-								local pos = btn.Position
-								tip.Position = UDim2.fromOffset(
-									math.clamp(pos.X.Offset, 8, 900 - 270),
-									math.max(84, pos.Y.Offset - tip.Size.Y.Offset - 4)
-								)
-								tip.Visible = true
-							end)
-							btn.MouseLeave:Connect(function()
-								tip.Visible = false
-							end)
-						end
-
-						x = x + w + gap
-					end
-				end
-
-				-- refresh button
-				local refresh = Instance.new("TextButton")
-				refresh.Size = UDim2.fromOffset(74, 26)
-				refresh.Position = UDim2.new(1, -80, 0, 9)
-				refresh.BackgroundColor3 = Color3.fromRGB(57, 71, 110)
-				refresh.Text = "Refresh"
-				refresh.TextColor3 = Color3.new(1, 1, 1)
-				refresh.Font = Enum.Font.GothamBold
-				refresh.TextSize = 11
-				refresh.BorderSizePixel = 0
-				refresh.Parent = frame
-				local rc = Instance.new("UICorner")
-				rc.CornerRadius = UDim.new(0, 8)
-				rc.Parent = refresh
-				refresh.MouseButton1Click:Connect(function()
-					-- Close and reopen from Keyboard Free Keys to get a fresh assignment scan.
-					gui:Destroy()
-					tbl12._KeyMapGui = nil
-					fn18("Closed — click Keyboard Free Keys again to refresh", "Key Map", 2)
-				end)
-
-				local totalKeys, assignedKeys = 0, 0
-				for _, row in ipairs(rows) do
-					for _, label in ipairs(row) do
-						totalKeys += 1
-						local values = assignments[label:upper()]
-						if values and #values > 0 then assignedKeys += 1 end
-					end
-				end
-				local summary = Instance.new("TextLabel")
-				summary.Name = "AssignmentSummary"
-				summary.BackgroundTransparency = 1
-				summary.Position = UDim2.new(0, 15, 1, -27)
-				summary.Size = UDim2.new(1, -30, 0, 16)
-				summary.Font = Enum.Font.GothamMedium
-				summary.Text = string.format("%d key positions  •  %d assigned  •  %d free", totalKeys, assignedKeys, totalKeys - assignedKeys)
-				summary.TextColor3 = Color3.fromRGB(120, 145, 177)
-				summary.TextSize = 10
-				summary.TextXAlignment = Enum.TextXAlignment.Left
-				summary.Parent = frame
 			end,
 		})
 	end
@@ -50161,6 +50967,12 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 		})
 	end
 
+	do
+		local AnchorWhitelist = tbl15.Lists:AddLeftGroupbox("Anchor Whitelist", "anchor")
+		tbl12.CreatePlayerDropdown(AnchorWhitelist, "AnchorWhitelist", tbl7.AnchorWhitelisted)
+		AnchorWhitelist:AddLabel("Selected players can move your anchored toys. When they let go, the toy re-anchors where they dropped it.", true)
+	end
+
 	toggles.WhitelistToggle:SetValue(true)
 	toggles.AutoWhitelistFriends:SetValue(true)
 
@@ -50204,7 +51016,18 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 		Menu:AddLabel("Menu Keybind"):AddKeyPicker("menukey", { Text = "Menu Keybind", Mode = "Toggle", Default = "RightShift", NoUI = false })
 		lib.ToggleKeybind = options.menukey
 
-		Menu:AddToggle("WatermarkT", {
+		-- Watermark: own box with tabs (Elements / Style / Colors). Control IDs of the old
+		-- watermark options are kept so saved configs still load.
+		local watermarkTabs = tbl15.Settings:AddLeftGroupbox("Watermark", "type"):AddTabbox({ PopOut = false })
+		local wmElementsTab = watermarkTabs:AddTab("Elements", "list")
+		local wmStyleTab = watermarkTabs:AddTab("Style", "palette")
+		local wmColorsTab = watermarkTabs:AddTab("Colors", "paint-bucket")
+		local function setWatermarkStyle(key, value)
+			if tbl12.SetWatermarkStyle then tbl12.SetWatermarkStyle(key, value) end
+		end
+
+		-- Elements -------------------------------------------------------------
+		wmElementsTab:AddToggle("WatermarkT", {
 			Default = true,
 			Text = "Watermark",
 			Callback = function(arg)
@@ -50216,24 +51039,77 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-
-		Menu:AddDropdown("WatermarkElements", {
+		wmElementsTab:AddDropdown("WatermarkElements", {
 			Values = tbl12.WatermarkElementOptions,
 			Default = tbl12.WatermarkElementDefaults,
 			Multi = true,
 			AllowNull = true,
-			Searchable = false,
+			Searchable = true,
 			Text = "Show Elements",
 			ValueImages = {
 				Icon = "image", ["HuiG Custom"] = "sparkles", FPS = "gauge", Ping = "wifi",
 				["Script Version"] = "code", Time = "clock", Account = "user", ["Chroma Wave"] = "waves-horizontal",
+				Date = "calendar", Session = "timer", Players = "users", Memory = "memory-stick",
+				["Display Name"] = "id-card", Game = "gamepad-2",
 			},
 			Callback = function(value)
 				if tbl12.SetWatermarkElements then tbl12.SetWatermarkElements(value) end
 			end,
 		})
 
-		Menu:AddSlider("WatermarkSize", {
+		wmElementsTab:AddDivider("Order")
+
+		wmElementsTab:AddDropdown("WatermarkMoveElement", {
+			Values = tbl12.WatermarkTextElements,
+			Default = 1,
+			Multi = false,
+			Text = "Element",
+		})
+
+		local function moveWatermarkElement(direction)
+			if not tbl12.MoveWatermarkElement then return end
+			local order = tbl12.MoveWatermarkElement(options.WatermarkMoveElement.Value, direction)
+			if options.WatermarkOrder then options.WatermarkOrder:SetValue(order) end
+		end
+		wmElementsTab:AddButton({
+			Text = "Move Left",
+			Icon = "arrow-left",
+			Func = function() moveWatermarkElement(-1) end,
+		}):AddButton({
+			Text = "Move Right",
+			Icon = "arrow-right",
+			Func = function() moveWatermarkElement(1) end,
+		})
+
+		wmElementsTab:AddInput("WatermarkOrder", {
+			Text = "Order",
+			Default = table.concat(tbl12.WatermarkTextElements, ", "),
+			Placeholder = "FPS, Ping, Time",
+			Finished = true,
+			ClearTextOnFocus = false,
+			Tooltip = "Type the order, separated by commas. Missing elements are added at the end.",
+			Callback = function(value)
+				if not tbl12.SetWatermarkOrder then return end
+				local normalized = tbl12.SetWatermarkOrder(value)
+				if normalized ~= value and options.WatermarkOrder then
+					options.WatermarkOrder:SetValue(normalized)
+				end
+			end,
+		})
+
+		-- Style ----------------------------------------------------------------
+		wmStyleTab:AddDropdown("WatermarkPosition", {
+			Values = { "Custom", "Top Center", "Top Left", "Top Right", "Bottom Left", "Bottom Center", "Bottom Right" },
+			Default = 1,
+			Multi = false,
+			Text = "Position",
+			Tooltip = "Custom = wherever you dragged it",
+			Callback = function(value)
+				if tbl12.SetWatermarkPosition then tbl12.SetWatermarkPosition(value) end
+			end,
+		})
+
+		wmStyleTab:AddSlider("WatermarkSize", {
 			Text = "Watermark Size",
 			Default = 6,
 			Min = 1,
@@ -50246,7 +51122,54 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		Menu:AddSlider("WatermarkChromaSpeed", {
+		wmStyleTab:AddDropdown("WatermarkFont", {
+			Values = { "Theme", "Gotham", "Montserrat", "Ubuntu", "SourceSans", "Code", "RobotoMono", "FredokaOne", "Arcade" },
+			Default = 1,
+			Multi = false,
+			Text = "Font",
+			Callback = function(value) setWatermarkStyle("Font", value) end,
+		})
+
+		wmStyleTab:AddDropdown("WatermarkSeparator", {
+			Values = { "·", "|", "/", "•", "—", "Space" },
+			Default = 1,
+			Multi = false,
+			Text = "Separator",
+			Callback = function(value) setWatermarkStyle("Separator", value) end,
+		})
+
+		wmStyleTab:AddDropdown("WatermarkClock", {
+			Values = { "24h", "12h" },
+			Default = 1,
+			Multi = false,
+			Text = "Clock",
+			Callback = function(value) setWatermarkStyle("Clock", value) end,
+		})
+
+		wmStyleTab:AddToggle("WatermarkSeconds", {
+			Text = "Show Seconds",
+			Default = true,
+			Callback = function(value) setWatermarkStyle("Seconds", value) end,
+		})
+
+		wmStyleTab:AddToggle("WatermarkQuality", {
+			Text = "Color FPS & Ping",
+			Default = true,
+			Tooltip = "Green / yellow / red depending on how good they are",
+			Callback = function(value) setWatermarkStyle("QualityColors", value) end,
+		})
+
+		wmStyleTab:AddSlider("WatermarkCorner", {
+			Text = "Corner Roundness",
+			Default = 6,
+			Min = 0,
+			Max = 16,
+			Rounding = 0,
+			Compact = true,
+			Callback = function(value) setWatermarkStyle("Corner", value) end,
+		})
+
+		wmStyleTab:AddSlider("WatermarkChromaSpeed", {
 			Text = "Chroma Wave Speed",
 			Default = 120,
 			Min = 10,
@@ -50263,6 +51186,35 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end
 		end)
 
+		-- Colors ---------------------------------------------------------------
+		wmColorsTab:AddToggle("WatermarkCustomColors", {
+			Text = "Custom Colors",
+			Default = false,
+			Tooltip = "Off = follow the menu theme",
+			Callback = function(value) setWatermarkStyle("CustomColors", value) end,
+		})
+
+		local function watermarkColorRow(label, idx, styleKey, default)
+			wmColorsTab:AddLabel(label):AddColorPicker(idx, {
+				Default = default,
+				Title = "Watermark " .. label,
+				Callback = function(color) setWatermarkStyle(styleKey, color) end,
+			})
+		end
+		watermarkColorRow("Text", "WatermarkTextColor", "TextColor", Color3.new(1, 1, 1))
+		watermarkColorRow("Accent", "WatermarkAccentColor", "AccentColor", Color3.new(1, 1, 1))
+		watermarkColorRow("Background", "WatermarkBgColor", "BgColor", Color3.fromRGB(25, 25, 28))
+		watermarkColorRow("Outline", "WatermarkOutlineColor", "OutlineColor", Color3.fromRGB(55, 58, 61))
+
+		wmColorsTab:AddSlider("WatermarkBgTransparency", {
+			Text = "Background Transparency",
+			Default = 0,
+			Min = 0,
+			Max = 1,
+			Rounding = 2,
+			Compact = true,
+			Callback = function(value) setWatermarkStyle("BgTransparency", value) end,
+		})
 		Menu:AddDivider("Keybind Menu")
 
 		Menu:AddToggle("KeybindMenuOpen", {
@@ -57311,7 +58263,11 @@ end
 			{ Id = "__cmd_jet", Name = "jet", DisplayName = "jet", Description = "Spawn the Jet", Command = "jet", Aliases = { "jet" }, Usage = "jet", RequiresArgument = false, Handler = "jet", Icon = "plane" },
 		} 
 
-		local CommandSettings = tbl15.Settings:AddRightGroupbox("Command Bar", "terminal")
+		local specialtiesTabs = tbl15.Settings:AddRightGroupbox("Specialties", "star"):AddTabbox({ PopOut = false })
+		local commandBarTab = specialtiesTabs:AddTab("Command Bar", "terminal")
+		local actionWheelTab = specialtiesTabs:AddTab("Action Wheel", "circle-dot")
+		-- CommandSettings is switched to the Action Wheel tab where its controls start.
+		local CommandSettings = commandBarTab
 		CommandSettings:AddLabel({ Text = "Run only the built-in HuiG Custom commands. For target commands, press Enter to use the top player/location suggestion. Default shortcut: L.", DoesWrap = true })
 		CommandSettings:AddToggle("CommandBarEnabled", {
 			Text = "Enable Command Bar",
@@ -57554,7 +58510,7 @@ end
 			end
 		end
 
-		CommandSettings:AddDivider("Action Wheel")
+		CommandSettings = actionWheelTab
 		CommandSettings:AddToggle("ResoActionWheelEnabled", {
 			Text = "Enable Action Wheel",
 			Default = true,

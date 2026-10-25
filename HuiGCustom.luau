@@ -268,7 +268,7 @@ local Library = {
         AccentColor = Color3.fromHex("ffffff"),
         OutlineColor = Color3.fromHex("373a3d"),
         FontColor = Color3.fromHex("ffffff"),
-        Font = Font.fromEnum(Enum.Font.Gotham),
+        Font = Font.fromEnum(Enum.Font.Roboto),
 
         RedColor = Color3.fromRGB(255, 50, 50),
         DestructiveColor = Color3.fromRGB(220, 38, 38),
@@ -378,7 +378,7 @@ local Templates = {
         NotifySide = "Right",
         ShowCustomCursor = true,
 
-        Font = Enum.Font.Gotham,
+        Font = Enum.Font.Roboto,
         ToggleKeybind = Enum.KeyCode.RightControl,
 
         ShowMobileButtons = true,
@@ -2185,9 +2185,6 @@ function Library:MakeDraggable(
         end
 
         if Dragging and IsHoverInput(Input) then
-            -- Low-latency drag: apply every pointer update immediately. Throttling
-            -- to 30-35 Hz and interpolating on RenderStepped made the window trail
-            -- behind the cursor even when the game itself had a high FPS.
             local Delta = Input.Position - StartPos
             local NewX = FramePos.X.Offset + Delta.X
             local NewY = FramePos.Y.Offset + Delta.Y
@@ -2275,8 +2272,6 @@ function Library:MakeResizable(UI: GuiObject, DragFrame: GuiObject, Callback: ()
             DidResize = true
         end
 
-        -- MainFrame's relative children resize automatically. Recompute tab/groupbox
-        -- internals at a lower rate, then always do one final pass when dragging ends.
         if Callback and DidResize and (force or now - LastCallbackUpdate >= 0.12) then
             LastCallbackUpdate = now
             Library:SafeCallback(Callback)
@@ -8327,7 +8322,7 @@ do
                 end
 
                 if IconRef then
-                    ValueImage = Library:GetCustomIcon(IconRef)
+                    ValueImage = typeof(IconRef) == "table" and IconRef or Library:GetCustomIcon(IconRef)
                 end
             end
 
@@ -10706,7 +10701,6 @@ function Library:Notify(...)
             SoundId = string.format("rbxassetid://%d", SoundId)
         end
 
-        -- Only one notification sound at a time: cut the previous if still playing.
         local previous = Library._ActiveNotifySound
         if previous then
             pcall(function()
@@ -10832,7 +10826,7 @@ function Library:CreateWindow(WindowInfo)
     Library.Animations = WindowInfo.Animations
     Library.TabTransitionInfo = TweenInfo.new(
         math.max(0, WindowInfo.TabTransitionTime or 0.35),
-        Enum.EasingStyle.Quart, -- Savitar uses Quart for tab swipe
+        Enum.EasingStyle.Quart,
         Enum.EasingDirection.Out
     )
     Library.TabSwipeOffset = math.max(1, WindowInfo.TabSwipeOffset or 26)
@@ -12790,11 +12784,9 @@ function Library:CreateWindow(WindowInfo)
 
             Library.ActiveTab = Tab
 
-            -- Keep the Savitar glow in lockstep with the library's actual tab switch.
             task.defer(function()
                 local syncIndicator = _G._syncSavitarTabIndicator
                 if type(syncIndicator) == "function" then
-                    -- Pass the exact tab selected by this Show() call; do not re-read stale ActiveTab.
                     syncIndicator(false, Tab)
                 end
             end)
@@ -13253,11 +13245,9 @@ function Library:CreateWindow(WindowInfo)
 
             Library.ActiveTab = Tab
 
-            -- Keep the Savitar glow in lockstep with the library's actual tab switch.
             task.defer(function()
                 local syncIndicator = _G._syncSavitarTabIndicator
                 if type(syncIndicator) == "function" then
-                    -- Pass the exact tab selected by this Show() call; do not re-read stale ActiveTab.
                     syncIndicator(false, Tab)
                 end
             end)
@@ -13829,8 +13819,6 @@ function Library:CreateWindow(WindowInfo)
             Library.Toggled = not Library.Toggled
         end
 
-        -- The menu on/off animation is intentionally disabled: visibility changes
-        -- immediately, avoiding open/close tween spikes and toggle input delay.
         MainFrame.Visible = Library.Toggled
 
         if WindowInfo.UnlockMouseWhileOpen then
@@ -13930,7 +13918,6 @@ function Library:CreateWindow(WindowInfo)
             Changed = Input.Changed:Connect(function()
                 if Input.UserInputState ~= Enum.UserInputState.End then return end
 
-                -- Commit the last mouse position even if the 30 Hz throttle skipped it.
                 ApplySidebarWidthAt(LastSidebarPointer, true)
                 Library.CantDragForced = false
                 TweenService:Create(DividerLine, Library.TweenInfo, {
@@ -15649,7 +15636,6 @@ function ThemeManager:CreateThemeManager(Themesbox: any)
         DoesWrap = true,
     })
 
-    -- Build the list from Roblox's actual Enum so the current/default face is always selectable.
     local FontFaceValues = {}
     for _, FontItem in ipairs(Enum.Font:GetEnumItems()) do
         table.insert(FontFaceValues, FontItem.Name)
@@ -15658,8 +15644,7 @@ function ThemeManager:CreateThemeManager(Themesbox: any)
 
     Themesbox:AddDropdown("FontFace", {
         Text = "Font Face",
-        -- Library.Scheme.Font and the startup theme use Gotham; do not claim the initial face is Code.
-        Default = "Gotham",
+        Default = "Roboto",
         Values = FontFaceValues,
         AllowNull = false,
         Multi = false
@@ -16501,7 +16486,6 @@ function SaveManager:SaveJSON(ConfigName)
         end
     end
 
-    -- persist non-UI state (mobile buttons, etc.)
     if type(SaveManager.GetExtraSaveData) == "function" then
         local ok, extra = pcall(SaveManager.GetExtraSaveData)
         if ok and type(extra) == "table" then
@@ -17169,7 +17153,6 @@ local gethui = gethui or get_hidden_gui or function() return game:GetService("Co
 
 local huiGLogoAsset = nil
 local huiGCoinLogoAsset = nil
--- Embedded HuiG logo: register locally so the GUI does not depend on a hosted image URL.
 do
 	local logoChunks = {
 		"iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAEAAElEQVR4nOydd4AURfbHX1X39MzmxMKSJAcRUEEJIgLmHDjDmVBUUAQVMWHOARVMGFAPM6Yz6w8UExgQFCVn2LzL5jjT3dUVfn90V0/vgp53IuxCfe7GXXZmenp6evq9euH7ABQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFAqFQqFQKBQKhUKhUCgUCoVCoVAoFIq/BNrTO6BQKBSK1glCCBBCO/xOKf1fNofdzSCEMfa3CQDABQfOuAg8lgOA2GELv4Ou6yCEACEEgBDAxZ9+6l6NcgAUCoVC8YdI4x409n/CyOuRhASUEInghIQEPSMjI6djx477p6en6ykpKeDdIqmpqR2Tk5N7ZmZmHJaentkuHDYAYwwYY0AIIQECOGOCUgaOQ8CyLFpfX7ulrq5xfV1d3dra2trimppaXldXh2pqalhRYeHK6prq8mg0yqLRqACAne5o0CnwnYN9DOUAKBQKhcLHM7wA8B8NPQpHIuHMjAzIzs7O6dOnz5E5Oe1Fp04djY4d2x/VoUOnM7KysnB6ejpOTUuF5ORk0DX9b913IQAIsaG+vh4qKyt4eXmFlZef90Z+Xv4vGzduZKtXr/6qrKysory83AQ3iuCjaZq3DQGc851tfq9DOQAKhUKxj4IQAhluBwBgjO30YckpyYnt2rVDHTt07HvggQeO6NWzl955v/2O7dJlv2M7dOgAmVmZENJDv/s6nHOgriexM28CAwBGCGHX7wiaJeSH7AXnIIT8k+AgBAgAimVkwnsaxljXdV2XTkwQxhiUlpbC+vXrf1u7bu0bixct3rp6zZqvcnO32YwyEnyspml7vTOgHACFQqHYBwiG8f/AsIW6du2amJOTkzXwoIGnDRgwIKVbl24junXvdmynTp0hNSVlp9t2HIcKLigAAOcCQAgda1jHCAPWNEAYwU7s8e8jvAS/F5YXrrHf8T35PxEA9n4iAW6qXwDjnAvOKYCb9kcIdMMI6UHT1xhthNVrVpWvXb3m2YVffbXy119+/WrLli0NEKgx0DQNOOd7XZpAOQAKhUKxFyJX93+U427Tpk1G7969MwYPPvTCYcOGZvbs1fOMbt26ds5uk93kcUIIzigDxhkFAO6uuJGuYaz7KQPP6DZ9HQTILe0D5NtTBMGHICQABAIA18jLbXGvYM97fXcbyH2c90CQAQP3J/IeK7e5Y5WgdHwc6nDBORECsKZpeiQS8cMg9fV18MsvyxctWPDF5wu//Py1Fb+tKAUABuCmRwABcLZ3RAWUA6BQKBR7ARgjQAj/7ko1MTExqe/++6f16tnz4OHDh48dMGBAu+7du5+0X5cugAPLc845pZRyz+hyEKBrWNPd7cdD7U3C9d7LuSt19x+eeQaEkX+ffBnhGXzfiPsbQf6+C9581R//F/L+BzjeKeDnB+QGvaiBCDoRQroZ8SiB5xRwIQRFGEPYMDDGWAcAIITAL7/8suLtd96e/cH7H7xfWFhYI/dB07TfS5m0GpQDoFAoFK0QhBBomva7RXo5Hdq3HXBA/7RDDjnkwlGjRh3Qu1ev4zt06JgYjoT9x3DOKSWUc8EBYQSahnVN0zEKrKZ9Z0L+RG44XzoAntn1IwBNdzLuCEhzLoQAwYXnYDR9uPd8zgXnbqOfa6CR+yIYYQQIa1g6Dgi7L+LVMWBv92BHR0K+h+CeNHlL/jEFAGCMUc45D4VCoGmaAQBQVlYGH3/88UsvvfzSI0t+XLJe7nNrdgSUA6BQKBStABnS/70V/n5d9usweNCgNocOGz7lsKFDe/fq1WtUhw4dmjyGUmoxxjBCCBAgjDHWkbTmAgAwAPYW54BQs9VzII+PAitvgCbGn3HGgblGVwBwQEARQtx7DxghZGCEsYwM7Aq8lTxlLF7IxznXAUAPRCKwTC/4z0Px9+XeF0hDuNsAQginlNFIOKyHI2FMHALffP310mefe+7mjz/6+Dsh3NoH+dm0JpQDoFAoFC0QWbCHMd7pKr9z587tRowY0f2QQw65bOTIkYN69Oh+UFZWG/9+zjkltkOFEBjrCGtYw7qu4+A2mubsUfy/OzPwEA+hc845AgRccLciH1wjjzHW5Yp5Z3DOIWbGwDStWENDvVVbWwd1dTU8FosBIYSbplVuxczSmGluppTWcc6JEEIghHRd17NTUlJ6Jycnd09MTExISkqCjMwMyEjPgLS0tNRIJBIJh8O/+7rEJjHGGAACA2OMNU3D2K0c9KMawosQuMcGQAjuO1yMMaCUEl3XeXJycgQAYOnSpYUPPPDApR9//PGXACCCNRetAeUAKBQKRQvhj1b5ycnJoaFDhx4ycuTIUUcdddT4/v37905PT/fv55xTQhwqhNAxRqBhTXedCOwaNyRtXSDrLkPsACAC5iCeVhcghOASAKAYYwiFQok723/TNKGqurq8uLi4oaSkGOfn539bXVW9sLq6uqKsvAyXlJTYRYVFGxuj0Spi28xxHEQIke9Vxh4ENOvRl7sFXssgAGCEkTBChjAMQ0QikUhqWmpO1y5du7Zt1w61z2mHs7Iyj+iz//7ndNmvq96hfU777DbZRsiI+yZCCG5btsU4NzSMQdM1HSMs2wyBM3c3/CJK90kAAMA4p7qu00gkEgEAmD9//o833XTTP1avXr0doPVEA5QDoFAoFHuIYGte8zxyyAjhLvt1yRl91FGDjxo9+vqRI0ce1LFjx1R5vxCCU0otwYWBNYwRwjgeyvYf5a5kEQIZcUeBQrm4PK4rtysY5xwERwAcaxoHANB1PRLcL4c6UFNTA1WV1as2b97EN2xY92Nubv47xcXFzqZNG6uLioq3mJbFOWMI/qRkb3M5YbSjIIDcYb+wL7DS/qPtI13XITU1NfHAgQMG9Ord2zj44IOvPfTQId179OgxMOhAMcaI4xBACPtFgL4jJosbvdSItyvA3XYAkpycHGlsaICHHp4x9aEHH3qaMUZbQ22AcgAUCoViN/IHoX2U1aaNcdhhw0ePGTNq2OjRY6b163tAarBoT+bwvVA7Dor4BIkbR+RX38dX/8jNz7thbSo450IA13RtB2Pf0NAApaWlm9avW7/9txW/Ld+Wu+2V3NxcWLd2",
@@ -17367,8 +17350,6 @@ do
 							end
 
 							do
-								-- Only remember a real height (NaN ~= NaN): running the script again while
-								-- void is already disabled must not save "disabled" as the original.
 								local currentHeight = workspace.FallenPartsDestroyHeight
 								if currentHeight == currentHeight then
 									getgenv().ResonanceOriginalFallenHeight = currentHeight
@@ -17701,8 +17682,9 @@ do
 							AntiLagSens = 3,
 							InputLgDelay = 0.05,
 							GucciType = "CreatureBlobman",
-							AKType = "Shuriken",
-							AKTypes = { Shuriken = true },
+							AKToy = "NinjaShuriken",
+							AKPos = { 0, -0.3, 0 },
+							AKRot = { 90, 0, 0 },
 							AntiInputType = "FoodHamburger",
 							FasterEscape = 3,
 							AGType = "Normal",
@@ -17716,6 +17698,9 @@ do
 							NKDelayMode = "Normal",
 							KickServerMethod = "Circle + Lag",
 							KickFlags = 0,
+							FlagsBeforeReset = 1,
+							FlagResetTimer = 1,
+							FlagsBeforeLeave = 4,
 							AuraDistance = 25,
 							ToyAuraDistance = 31,
 							SexAuraSpeed = 1,
@@ -18214,7 +18199,6 @@ do
 								AnimSpeed = 7,
 								Lift = 3.5,
 								LegCount = 8,
-								-- deposition (tune these)
 								HipClearance = 4,
 								HipY = -0.15,
 								Gap = 0,
@@ -19448,8 +19432,6 @@ do
 						tbl11.SetNetworkOwner:FireServer(arg, cframe)
 					end
 
-					-- Fires network ownership 10-15 times (random count, random grab point each
-					-- time). Runs in the background, or blocks until done when waitUntilDone is true.
 					tbl12.OwnershipBurst = function(parts, waitUntilDone)
 						local list = {}
 						for _, part in ipairs(parts) do
@@ -20992,10 +20974,8 @@ end
 					local children = v24:GetChildren()
 					local flag13 = false
 
-					-- arg2 can be string ("LeftLeg") or list { "LeftLeg", "RightArm" } or multi-map from dropdown
 					local limbSet = {}
 					if type(arg2) == "table" then
-						-- multi dropdown Value map { LeftLeg = true, ... } OR array
 						local isMap = false
 						for k, v in pairs(arg2) do
 							if type(k) == "string" and v == true then
@@ -21512,12 +21492,47 @@ end
 						end
 					end
 
+					tbl12.GetHeldBy = function()
+						local character = localPlayer.Character
+						if not character then
+							return nil
+						end
+						for _, partName in ipairs({ "Head", "HumanoidRootPart", "Torso" }) do
+							local part = character:FindFirstChild(partName)
+							local owner = part and part:FindFirstChild("PartOwner")
+							if owner and owner:IsA("StringValue") then
+								local grabber = Players:FindFirstChild(owner.Value)
+								if grabber and grabber ~= localPlayer then
+									return grabber
+								end
+							end
+						end
+						return nil
+					end
+
+					tbl12.HeldByWhitelisted = function()
+						if not tbl8.AllowWhitelistedGrabs then
+							return false
+						end
+						local grabber = tbl12.GetHeldBy()
+						return grabber ~= nil and tbl7.Whitelisted[grabber] == true
+					end
+
 					tbl12.AntiGrab = function()
 						if flag11 then
 							return
 						end
 
 						if isHeld.Value and tbl8.AntiGrab and not tbl7.States["Anti Grab"] then
+							if tbl8.AllowWhitelistedGrabs then
+								local deadline = tick() + 0.15
+								while isHeld.Value and not tbl12.GetHeldBy() and tick() < deadline do
+									task.wait()
+								end
+								if not isHeld.Value or tbl7.States["Anti Grab"] or tbl12.HeldByWhitelisted() then
+									return
+								end
+							end
 							tbl11.Struggle:FireServer()
 							local v23, v24, v25 = tbl12.Char()
 							local torso = v23 and v23:FindFirstChild("Torso")
@@ -21625,7 +21640,7 @@ end
 									v24.Scream.Playing = false
 								end
 
-								if not isHeld.Value or not tbl8.AntiGrab then
+								if not isHeld.Value or not tbl8.AntiGrab or tbl12.HeldByWhitelisted() then
 									tbl7.States["Anti Grab"] = false
 
 									if sit then
@@ -25606,7 +25621,6 @@ end
 
 					tbl12.DestroyToy = function(arg)
 						if arg and arg:IsA("Model") then
-							-- drop from anchor system first (stops Heartbeat work on dead toys)
 							pcall(function()
 								if tbl12.ReleaseObject then
 									tbl12.ReleaseObject(arg)
@@ -25727,7 +25741,6 @@ end
 										tbl12.DestroyToy(FoodCoconut)
 										break
 									else
-										-- Next model index (1-based) once added — Legs keep collision, other forms do not.
 										for _, v22 in FoodCoconut:QueryDescendants("BasePart") do
 											v22.CanCollide = false
 											v22.CanQuery = false
@@ -25763,7 +25776,6 @@ end
 
 					tbl12.UpdateCoconutForms = function()
 						local coconutForms = tbl7.CoconutForms
-						-- Optional: attach forms to another player instead of local
 						local targetPlr = nil
 						if tbl8.CoconutOnOthers then
 							local selected = tbl7.CoconutTargets or {}
@@ -26291,7 +26303,6 @@ end
 										end
 										n49 = CFrame.new(ox, oy, oz) * rot
 									end
-									-- Tentacles: improved organic octopus-style (multi-wave, independent phase, strong tip curl)
 									local tentStart = coconutForms.TentaclesStart
 									local num = math.clamp(coconutForms.TentaclesCount or 4, 1, 6)
 									local segs = math.clamp(coconutForms.TentaclesLength or 5, 2, 10)
@@ -26311,40 +26322,34 @@ end
 										local wave = coconutForms.TentaclesWave or 1.05
 										local spacing = coconutForms.TentaclesSpacing or 0.75
 
-										-- independent phase per tentacle for organic feel
 										local tentPhase = phase + tent * 1.37 + (tent % 2) * 0.85
 										local lag = tentPhase - seg * (0.38 + wave * 0.22)
 										local lag2 = lag * 1.73 + 0.4
 										local lag3 = lag * 0.55 - 0.7
 
-										-- multi-frequency undulation
 										local primary = math.sin(lag) * swayAmt * (0.15 + t * 1.05)
 										local secondary = math.sin(lag2) * swayAmt * 0.42 * t
 										local tertiary = math.sin(lag3) * swayAmt * 0.18 * (t * t)
 										local sway = primary + secondary * 0.6
 										local swaySide = secondary + tertiary
 
-										-- radial fan from upper back / shoulders
 										local fan = (tent - 0.5) / math.max(num, 1) - 0.5
 										local baseAngle = fan * spread * 2.85 + sway * 0.18
 
-										-- tip curl (milder – stays behind/out, not into face)
 										local tip = t * t * t
 										local mid = t * t
 										local curl = math.sin(lag * 0.7 + tent * 0.3) * curlAmt * (0.2 + mid * 0.7)
 
-										-- length & shape (mostly backward / outward)
 										local segLen = spacing * (0.85 + reach * 0.35)
 										local len = 0.35 + t * (1.55 + reach * 1.35) * (segLen / 0.75)
 										local up = 0.55 + t * 0.65 + curlAmt * mid * 0.7 + curl * 0.45 - tip * 0.15
-										local backLen = len * (1 - tip * 0.35)   -- keep most of the length going back
-										local frontPull = tip * (0.35 + reach * 0.25) + mid * 0.08  -- much weaker forward bend
+										local backLen = len * (1 - tip * 0.35)
+										local frontPull = tip * (0.35 + reach * 0.25) + mid * 0.08
 
 										local ox = math.sin(baseAngle) * backLen + swaySide * 0.45 * t
 										local oy = up
 										local oz = 0.55 + math.cos(baseAngle * 0.55) * backLen * 1.05 - frontPull
 
-										-- smooth orientation along the curve
 										local t2 = math.min(t + 0.07, 1)
 										local tip2 = t2 * t2 * t2
 										local mid2 = t2 * t2
@@ -26504,7 +26509,6 @@ end
 									coconutForms.TentaclesStart = #offsets + 1
 									local num = math.clamp(coconutForms.TentaclesCount or 4, 1, 6)
 									local segs = math.clamp(coconutForms.TentaclesLength or 5, 2, 10)
-									-- keep total under limit
 									if num * segs > 20 then
 										segs = math.max(2, math.floor(20 / num))
 									end
@@ -26605,8 +26609,6 @@ end
 						if tbl8.GucciAntiGrab then reservedSpace += 25 end
 						if tbl8.AntiInputLag then reservedSpace += 5 end
 
-						-- Plot budget is larger (600 item-space units). Latch it while Coconut Forms
-						-- remains enabled so crossing out of the safe zone won't shrink and despawn forms.
 						local inPlotValue = localPlayer:FindFirstChild("InPlot")
 						local currentlyInPlot = inPlotValue and inPlotValue.Value == true
 						if currentlyInPlot and tbl8.CoconutForms then
@@ -26628,8 +26630,6 @@ end
 							return used
 						end
 
-						-- Slider maximums reflect reserved Anti-Kick/Gucci/Network space.
-						-- Selected forms may impose a lower effective value to stay inside the same budget.
 						local globalMaxShaftLength = math.max(3, limit - 2)
 						local shaftOption = options.CoconutShaftLength
 						if shaftOption and shaftOption.SetMax then
@@ -26672,7 +26672,6 @@ end
 						end
 					end
 
-						-- Recalculate on plot entry/exit, without disabling Coconut Forms.
 						local coconutInPlotValue = localPlayer:FindFirstChild("InPlot")
 						if coconutInPlotValue and not tbl7.CoconutForms.PlotBudgetConnection then
 							local coconutFormsState = tbl7.CoconutForms
@@ -26739,7 +26738,6 @@ end
 							end
 						end
 
-					-- ========== Ladder Spider ==========
 					tbl12.GetLadderRoot = function(model)
 						if not model then
 							return nil
@@ -27014,7 +27012,6 @@ end
 					end
 
 					tbl12.SetLadderSpider = function(enabled)
-						-- Ladder Spider feature removed.
 						if enabled then
 							enabled = false
 						end
@@ -27181,7 +27178,6 @@ end
 						local tbl17 = {}
 						arg3 = arg3 or 1
 
-						-- limit concurrent flying missiles when fly mode is on
 						if arg2 == "BombMissile" and tbl9.MissileFly then
 							local active = 0
 							for m in pairs(tbl12._FlyingMissiles) do
@@ -27272,10 +27268,8 @@ end
 								local useFly = (arg2 == "BombMissile") and tbl9.MissileFly and targetPos
 
 								if useFly then
-									-- Fly missile to target with noclip; tip always faces target
 									tbl12._FlyingMissiles[v23] = true
 									task.spawn(function()
-										-- speed read each frame so slider applies to in-flight missiles
 										for _, p in ipairs(v23:GetDescendants()) do
 											if p:IsA("BasePart") then
 												p.CanCollide = false
@@ -27301,7 +27295,6 @@ end
 										bg.Parent = wedge
 										local root = select(2, tbl12.Char())
 										local startPos = (root and root.Position or wedge.Position) + Vector3.new(0, 3, 0)
-										-- Wedge tip points along local +Y; aim +Y at target every frame
 										local function aimCF(fromPos, toPos)
 											local dir = toPos - fromPos
 											if dir.Magnitude < 1e-4 then
@@ -27631,7 +27624,6 @@ end
 						return tbl12.IsPartOwner(arg) or tbl12.IsNetworkOwner(arg)
 					end
 
-					-- Anchor Whitelist: returns the whitelisted player currently holding this anchored toy (via its PartOwner tag)
 					tbl12.GetAnchorWhitelistHolder = function(objectState)
 						local whitelist = tbl7.AnchorWhitelisted
 						if not whitelist or next(whitelist) == nil then
@@ -27656,7 +27648,6 @@ end
 						return nil
 					end
 
-					-- same PartOwner scan as whitelist, but returns any non-local holder (for grab alerts)
 					tbl12.GetAnchorPartOwnerPlayer = function(objectState)
 						local parts = objectState.Parts
 						if not parts then
@@ -27692,7 +27683,6 @@ end
 						local count = 1
 						if state then
 							count = (state.Count or 1) + 1
-							-- kill old note so timer fully resets
 							if state.Note and not state.Note.Destroyed then
 								pcall(function() state.Note:Destroy("script") end)
 							end
@@ -28180,7 +28170,6 @@ end
 									return
 								end
 								arg.Anchored = anchored
-								-- clear whitelist drop-pose when user toggles anchor
 								local anchored2 = tbl7.Anchored
 								local target = arg.Target
 								local v22
@@ -28513,7 +28502,6 @@ end
 								if root and root.Parent then
 									local group = objectState.Group
 
-									-- Anchor grab notify + whitelist (PartOwner detection)
 									local isToyAnchor = objectState.Anchored and not (typeof(k) == "Instance" and k:IsA("Player"))
 									local partOwnerPlr = nil
 									if isToyAnchor then
@@ -28524,7 +28512,6 @@ end
 										local whitelist = tbl7.AnchorWhitelisted
 										local isWhitelisted = whitelist and whitelist[partOwnerPlr]
 										if not isWhitelisted then
-											-- edge: only fire when a new grab starts (holder changed)
 											if objectState.PrevAnchorGrabber ~= partOwnerPlr then
 												objectState.PrevAnchorGrabber = partOwnerPlr
 												tbl12.NotifyAnchorGrab(partOwnerPlr)
@@ -28536,7 +28523,6 @@ end
 										objectState.PrevAnchorGrabber = nil
 									end
 
-									-- Anchor Whitelist: let the whitelisted player move the toy, then re-anchor where they dropped it
 									local wlHolder = nil
 									if isToyAnchor then
 										wlHolder = tbl12.GetAnchorWhitelistHolder(objectState)
@@ -28551,7 +28537,6 @@ end
 										objectState.CFrame = root.CFrame
 										continue
 									elseif objectState.ExternalHolder then
-										-- released: objectState.CFrame already holds the last held position, normal anchoring resumes from it
 										objectState.ExternalHolder = nil
 										objectState.RetryAt = 0
 									end
@@ -33487,7 +33472,6 @@ end
 			end
 		end)
 
-		-- Sex aura: own loop (never inside stock auras)
 		task.spawn(function()
 			while task.wait(0.03) do
 				if flag11 then
@@ -34533,8 +34517,6 @@ Escape Timer: %*]]
 				until flag11 or not tbl8.AntiKick or os.clock() >= n36
 			end
 
-			-- Shared Anti-Kick item creation/validation. Both item styles use the same
-			-- SpawnToy path, StickyPart/StickyWeld readiness checks, and SNO validation.
 			local function spawnAntiKickItem(toyName, spawnCFrame)
 				local item = tbl12.SpawnToy(toyName, spawnCFrame, 3, true)
 				local stickyPart = item and item:WaitForChild("StickyPart", 1.5)
@@ -34550,8 +34532,6 @@ Escape Timer: %*]]
 				return spawnAntiKickItem("NinjaShuriken", arg.CFrame + Vector3.new(0, 15, 0))
 			end
 
-			-- Katana-on-back positioning borrowed from the supplied Jawstands setup.
-			-- The existing HuiG Anti-Kick loop still owns creation, cleanup, and appearance.
 			local AK_KATANA_NAME = "NinjaKatana"
 			local AK_KATANA_SPAWN_CFRAME = CFrame.new(
 				25.105476379395, -5.6013350486755, -1.2006587982178,
@@ -34559,58 +34539,20 @@ Escape Timer: %*]]
 				0, 0.86709922552109, 0.4981355369091,
 				-0.78757798671722, 0.30695861577988, -0.53431957960129
 			)
-			local AK_KATANA_STICK_CFRAME = CFrame.new(
-				-0.50864791870117, -0.45275592803955, 0.49962902069092,
-				0.73902928829193, 0.0056432783603668, 0.67365008592606,
-				0.67311108112335, -0.047039534896612, -0.73804396390915,
-				0.027523040771484, 0.99887728691101, -0.038561940193176
-			)
-
-			-- Pencil Dih (ToolPencil stuck under torso), same Anti-Kick lifecycle as Katana.
-			local AK_PENCIL_NAME = "ToolPencil"
 			local AK_PENCIL_SPAWN_CFRAME = CFrame.new(
 				-141.58135986328125, -5.5508937835693359, -199.61288452148438,
 				-0.42956897616386414, 0.54683172702789307, -0.71864151954650879,
 				0, 0.79580783843994141, 0.6055493950843811,
 				0.90303409099578857, 0.26012521982192993, -0.34185433387756348
 			)
-			-- Bottom-middle of Torso (from capture); slight downward/front offset.
-			local AK_PENCIL_STICK_CFRAME = CFrame.new(
-				0, -0.72, -0.55,
-				0.382070392370224, 0.92407459020614624, -0.010418176651000977,
-				0.9240533709526062, -0.38216128945350647, -0.0088432459160685539,
-				-0.01215329859405756, -0.0062481872737407684, -0.99990671873092651
-			)
-
-			-- Multi-select Anti-Kick styles (any combination).
-			do
-				local function normalizeAkTypes(value)
-					local allowed = { Shuriken = true, ["Katana On Back"] = true, ["Pencil Dih"] = true }
-					local out = {}
-					if type(value) == "table" then
-						for k, v in pairs(value) do
-							if v and allowed[k] then
-								out[k] = true
-							end
-						end
-					elseif type(value) == "string" and allowed[value] then
-						out[value] = true
-					end
-					if not next(out) then
-						out.Shuriken = true
-					end
-					return out
-				end
-				tbl9.AKTypes = normalizeAkTypes(tbl9.AKTypes or tbl9.AKType)
-				-- keep legacy string field as a display hint (first selected)
-				tbl9.AKType = (tbl9.AKTypes.Shuriken and "Shuriken")
-					or (tbl9.AKTypes["Katana On Back"] and "Katana On Back")
-					or (tbl9.AKTypes["Pencil Dih"] and "Pencil Dih")
-					or "Shuriken"
+			local function akStickCFrame()
+				local p, r = tbl9.AKPos, tbl9.AKRot
+				return CFrame.new(p[1], p[2], p[3]) * CFrame.Angles(math.rad(r[1]), math.rad(r[2]), math.rad(r[3]))
 			end
-			local function akTypeSelected(name)
-				return tbl9.AKTypes and tbl9.AKTypes[name] == true
+			local function akTorsoStickCFrame(torso, hitbox)
+				return torso.CFrame:ToObjectSpace(hitbox.CFrame) * akStickCFrame()
 			end
+			local akGen = 0
 			local function destroyAkItem(itemRef)
 				if itemRef then
 					pcall(function()
@@ -34684,6 +34626,22 @@ Escape Timer: %*]]
 						end
 					end
 
+					if tbl9.AKDirtyAt then
+						if os.clock() - tbl9.AKDirtyAt <= 0.4 then
+							continue
+						end
+						tbl9.AKDirtyAt = nil
+						akGen += 1
+						v18 = destroyAkItem(v18)
+						akKatanaItem = destroyAkItem(akKatanaItem)
+						akPencilItem = destroyAkItem(akPencilItem)
+						if akDonut then
+							pcall(function() tbl12.DestroyToy(akDonut) end)
+							akDonut = nil
+							akDonutRoot = nil
+						end
+					end
+
 					local antiKickSettings = tbl7.AntiKickSettings
 					local v22, v23, v24 = tbl12.Char()
 					local ragdollTouchedHitbox = v23 and v23:FindFirstChild("RagdollTouchedHitbox")
@@ -34699,9 +34657,9 @@ Escape Timer: %*]]
 							end
 						end
 
-						if not akTypeSelected("Shuriken") then
+						if tbl9.AKToy ~= "NinjaShuriken" then
 							v18 = destroyAkItem(v18)
-						else -- Shuriken
+						else
 							local parent2, shurHighlight, highlight2, antiKick, forcefieldChar, transparency, isMeshPart
 
 							if not (v18 and v18.Name == "ShurikenRSC" and v18:FindFirstChild("StickyPart") and v18.StickyPart:FindFirstChild("StickyWeld") and v18.StickyPart.StickyWeld.Part1 == ragdollTouchedHitbox) then
@@ -34736,7 +34694,7 @@ Escape Timer: %*]]
 												end
 											end)
 
-											tbl11.StickyPartEvent:FireServer(stickyPart, ragdollTouchedHitbox, CFrame.new(0, -0.3, 0) * CFrame.Angles(1.5707963267948966, 0, 0))
+											tbl11.StickyPartEvent:FireServer(stickyPart, ragdollTouchedHitbox, akStickCFrame())
 											now3 = tick()
 
 											while true do
@@ -34835,7 +34793,7 @@ Escape Timer: %*]]
 											end
 										end)
 
-										tbl11.StickyPartEvent:FireServer(stickyPart, ragdollTouchedHitbox, CFrame.new(0, -0.3, 0) * CFrame.Angles(1.5707963267948966, 0, 0))
+										tbl11.StickyPartEvent:FireServer(stickyPart, ragdollTouchedHitbox, akStickCFrame())
 										now3 = tick()
 
 										while true do
@@ -34941,7 +34899,7 @@ Escape Timer: %*]]
 											end
 										end)
 
-										tbl11.StickyPartEvent:FireServer(stickyPart, ragdollTouchedHitbox, CFrame.new(0, -0.3, 0) * CFrame.Angles(1.5707963267948966, 0, 0))
+										tbl11.StickyPartEvent:FireServer(stickyPart, ragdollTouchedHitbox, akStickCFrame())
 										now3 = tick()
 
 										while true do
@@ -35108,9 +35066,9 @@ Escape Timer: %*]]
 							end
 						end
 
-						if not akTypeSelected("Katana On Back") then
+						if tbl9.AKToy ~= AK_KATANA_NAME then
 							akKatanaItem = destroyAkItem(akKatanaItem)
-						else -- Katana On Back
+						else
 							local character = localPlayer.Character
 							local torso = character and (character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso"))
 							local rootPart = v23
@@ -35129,8 +35087,6 @@ Escape Timer: %*]]
 
 							if not akKatanaItem and torso and rootPart and rootPart:IsA("BasePart") and os.clock() >= akKatanaNextSpawnAttempt then
 								akKatanaNextSpawnAttempt = os.clock() + 0.35
-								-- Match the Shuriken spawn height: spawn 15 studs above the
-								-- player first, then attach using Jawstands' back-positioning offset.
 								local spawnRotation = AK_KATANA_SPAWN_CFRAME - AK_KATANA_SPAWN_CFRAME.Position
 								local spawnCFrame = (rootPart.CFrame + Vector3.new(0, 15, 0)) * spawnRotation
 								local katana, newStickyPart, newStickyWeld = spawnAntiKickItem(AK_KATANA_NAME, spawnCFrame)
@@ -35143,10 +35099,9 @@ Escape Timer: %*]]
 										end
 									end)
 
-									-- Match the Shuriken's one-shot stick request and bounded weld check.
 									local startedAt = tick()
 									pcall(function()
-										tbl11.StickyPartEvent:FireServer(newStickyPart, torso, AK_KATANA_STICK_CFRAME)
+										tbl11.StickyPartEvent:FireServer(newStickyPart, torso, akTorsoStickCFrame(torso, ragdollTouchedHitbox))
 									end)
 
 									while true do
@@ -35183,14 +35138,14 @@ Escape Timer: %*]]
 
 						end
 
-						if not akTypeSelected("Pencil Dih") then
+						if tbl9.AKToy == "NinjaShuriken" or tbl9.AKToy == AK_KATANA_NAME then
 							akPencilItem = destroyAkItem(akPencilItem)
 							if akDonut then
 								pcall(function() tbl12.DestroyToy(akDonut) end)
 								akDonut = nil
 								akDonutRoot = nil
 							end
-						else -- Pencil Dih
+						else
 							local character = localPlayer.Character
 							local torso = character and (character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso"))
 							local rootPart = v23
@@ -35205,7 +35160,6 @@ Escape Timer: %*]]
 								akPencilItem = nil
 							end
 
-							-- Async attach: SNO yields; must not block the AntiKick Heartbeat loop.
 							if not akPencilItem and torso and rootPart and rootPart:IsA("BasePart")
 								and os.clock() >= akPencilNextSpawnAttempt and not akPencilBusy then
 								akPencilNextSpawnAttempt = os.clock() + 0.35
@@ -35213,6 +35167,9 @@ Escape Timer: %*]]
 								local attachChar = character
 								local attachTorso = torso
 								local attachRoot = rootPart
+								local toyName = tbl9.AKToy
+								local stickCFrame = akTorsoStickCFrame(torso, ragdollTouchedHitbox)
+								local gen = akGen
 
 								task.spawn(function()
 									local okAttach, errAttach = pcall(function()
@@ -35222,7 +35179,7 @@ Escape Timer: %*]]
 
 										local spawnRotation = AK_PENCIL_SPAWN_CFRAME - AK_PENCIL_SPAWN_CFRAME.Position
 										local spawnCFrame = (attachRoot.CFrame + Vector3.new(0, 15, 0)) * spawnRotation
-										local pencil = tbl12.SpawnToy(AK_PENCIL_NAME, spawnCFrame, 3, true)
+										local pencil = tbl12.SpawnToy(toyName, spawnCFrame, 3, true)
 										local newStickyPart = pencil and pencil:WaitForChild("StickyPart", 2.5)
 										local newStickyWeld = newStickyPart and newStickyPart:WaitForChild("StickyWeld", 2.5)
 										local soundPart = pencil and pencil:FindFirstChild("SoundPart")
@@ -35237,13 +35194,11 @@ Escape Timer: %*]]
 											return
 										end
 
-										-- Grab 10-15x first (~0.2s) so we own it, then stick once.
 										tbl12.OwnershipBurst({ soundPart or newStickyPart }, true)
 										pcall(function()
-											tbl11.StickyPartEvent:FireServer(newStickyPart, attachTorso, AK_PENCIL_STICK_CFRAME)
+											tbl11.StickyPartEvent:FireServer(newStickyPart, attachTorso, stickCFrame)
 										end)
 
-										-- Only wait for the weld now; the stick is not fired again.
 										local startedAt = tick()
 										local attached = false
 										while tick() - startedAt < 1.5 do
@@ -35258,7 +35213,7 @@ Escape Timer: %*]]
 											task.wait(0.05)
 										end
 
-										if attached and tbl8.AntiKick and not flag11 and localPlayer.Character == attachChar then
+										if attached and gen == akGen and tbl8.AntiKick and not flag11 and localPlayer.Character == attachChar then
 											pcall(function()
 												for _, child in ipairs(newStickyPart:GetChildren()) do
 													if child:IsA("TouchTransmitter") or child.Name == "TouchInterest" then
@@ -35274,7 +35229,7 @@ Escape Timer: %*]]
 									end)
 
 									if not okAttach then
-										warn("[Pencil Dih] attach error:", errAttach)
+										warn("[Anti-Kick] attach error:", errAttach)
 									end
 									akPencilBusy = false
 								end)
@@ -35284,8 +35239,7 @@ Escape Timer: %*]]
 								styleAntiKickItem(akPencilItem, antiKickSettings)
 							end
 
-							-- Donut Beast: same pattern as Coconut Forms (SNO + root.CFrame, no anchor).
-							if tbl8.DonutBeast and tbl8.AntiKick and akTypeSelected("Pencil Dih")
+							if tbl8.DonutBeast and tbl8.AntiKick and tbl9.AKToy == "ToolPencil"
 								and akPencilItem and akPencilItem.Parent and akPencilItem.Name == "PencilAntiKickRSC" then
 								local pencilMesh = akPencilItem:FindFirstChild("Meshpart") or akPencilItem:FindFirstChild("StickyPart")
 								if pencilMesh and pencilMesh:IsA("BasePart") then
@@ -35301,7 +35255,6 @@ Escape Timer: %*]]
 												if not donut or not donut.Parent then
 													return
 												end
-												-- Coconut-style setup: break holdable if present, SNO physics root.
 												pcall(function()
 													if tbl12.BreakHoldable then
 														tbl12.BreakHoldable(donut)
@@ -35335,14 +35288,12 @@ Escape Timer: %*]]
 										if tbl12.IsPartOwner(akDonutRoot) then
 											akDonutPhase += 0.12
 											local slide = math.sin(akDonutPhase) * 1.25
-											-- Align hole on pencil shaft (Meshpart local Y), slide in/out.
 											local targetCf = pencilMesh.CFrame * CFrame.new(0, slide, 0) * CFrame.Angles(0, 0, math.rad(90))
 											if akDonutRoot.CFrame ~= targetCf then
 												akDonutRoot.CFrame = targetCf
 											end
 											pcall(function() tbl12.ResetVelocity(akDonutRoot) end)
 										else
-											-- Re-acquire ownership like coconut forms when lost.
 											if not akDonutAcquiring then
 												akDonutAcquiring = true
 												task.spawn(function()
@@ -35566,7 +35517,7 @@ Escape Timer: %*]]
 					if arg == "Flying" then
 						local now3 = tick()
 
-						if now3 - n36 > 1 then
+						if now3 - n36 > (tbl9.FlagResetTimer or 1) then
 							n36 = now3
 							tbl9.KickFlags = 1
 						else
@@ -35574,16 +35525,17 @@ Escape Timer: %*]]
 						end
 
 						if tbl8.AutoReset then
-							if tbl9.KickFlags >= 4 and tbl8.AutoLeave then
+							if tbl9.KickFlags >= (tbl9.FlagsBeforeLeave or 4) and tbl8.AutoLeave then
 								return localPlayer:Kick("HuiG Custom (Auto Reset)\nAvoided Kick")
 							end
+							local flagsBeforeReset = tbl9.FlagsBeforeReset or 1
 							local v22, v23, v24 = tbl12.Char()
 
-							if v24 then
+							if v24 and tbl9.KickFlags >= flagsBeforeReset then
 								v24:ChangeState(Enum.HumanoidStateType.Running)
 								v24:ChangeState(Enum.HumanoidStateType.Dead)
 
-								if tbl9.KickFlags == 1 then
+								if tbl9.KickFlags == flagsBeforeReset then
 									fn18("Reset due to kick flag", "Auto Reset")
 								end
 							end
@@ -36517,6 +36469,9 @@ Escape Timer: %*]]
 		end
 
 		task.spawn(function()
+			local immuneDefaultPreset = { Toy = "NinjaShuriken", Pos = { 0, -0.3, 0 }, Rot = { 90, 0, 0 } }
+			local immuneKatanaSpawnRotation = CFrame.new(0, 0, 0, -0.61621505022049, -0.39232057332993, 0.68290823698044, 0, 0.86709922552109, 0.4981355369091, -0.78757798671722, 0.30695861577988, -0.53431957960129)
+			local immunePencilSpawnRotation = CFrame.new(0, 0, 0, -0.42956897616386414, 0.54683172702789307, -0.71864151954650879, 0, 0.79580783843994141, 0.6055493950843811, 0.90303409099578857, 0.26012521982192993, -0.34185433387756348)
 			while task.wait(0.03) do
 				if flag11 then
 					return
@@ -36533,45 +36488,146 @@ Escape Timer: %*]]
 					end
 				end
 
+				local immunePreset = tbl9.ImmuneAKPreset or immuneDefaultPreset
+				if tbl7.ImmuneAppliedPreset ~= immunePreset then
+					tbl7.ImmuneAppliedPreset = immunePreset
+					for k, item in tbl7.ImmuneShurikens, nil, nil do
+						tbl12.DestroyToy(item)
+						tbl7.ImmuneShurikens[k] = nil
+					end
+				end
+				local immuneStick = CFrame.new(immunePreset.Pos[1], immunePreset.Pos[2], immunePreset.Pos[3])
+					* CFrame.Angles(math.rad(immunePreset.Rot[1]), math.rad(immunePreset.Rot[2]), math.rad(immunePreset.Rot[3]))
+				local immuneOnTorso = immunePreset.Toy ~= "NinjaShuriken"
+
 				for k in tbl7.ImmunePlayers, nil, nil do
 					local v22, v23, v24 = tbl12.Char()
-					local v25, ragdollTouchedHitbox, v26 = tbl12.Char(k)
-					ragdollTouchedHitbox = ragdollTouchedHitbox and ragdollTouchedHitbox:FindFirstChild("RagdollTouchedHitbox")
+					local v25, targetRoot, v26 = tbl12.Char(k)
+					local ragdollTouchedHitbox = targetRoot and targetRoot:FindFirstChild("RagdollTouchedHitbox")
 					local inPlot2 = k:FindFirstChild("InPlot")
+					local targetTorso = v25 and (v25:FindFirstChild("Torso") or v25:FindFirstChild("UpperTorso"))
+					local attachPart = immuneOnTorso and targetTorso or ragdollTouchedHitbox
 
-					if not (not v25 or not v23 or not v24 or v24.Health == 0 or not ragdollTouchedHitbox or inPlot2 and inPlot2.Value) then
+					if not (not v25 or not v23 or not v24 or v24.Health == 0 or not ragdollTouchedHitbox or not attachPart or inPlot2 and inPlot2.Value) then
 						local v27 = tbl7.ImmuneShurikens[k]
-						local stickyWeld = v27 and v27:FindFirstChild("StickyPart") and v27.StickyPart:FindFirstChild("StickyWeld")
+						local stickyWeld = v27 and v27.Parent and v27:FindFirstChild("StickyPart") and v27.StickyPart:FindFirstChild("StickyWeld")
+						local isAttached = stickyWeld and stickyWeld.Parent and (stickyWeld.Part1 == attachPart or stickyWeld.Part0 == attachPart)
 
-						if not (stickyWeld and stickyWeld.Part1 == ragdollTouchedHitbox) then
-							tbl12.DestroyToy(tbl7.ImmuneShurikens[k])
-							local NinjaShuriken = tbl12.SpawnToy("NinjaShuriken")
-							local stickyPart = NinjaShuriken and NinjaShuriken:WaitForChild("StickyPart", 1.5)
-							local stickyWeld2 = stickyPart and stickyPart:WaitForChild("StickyWeld", 1.5)
+						if not isAttached then
+							tbl12.DestroyToy(v27)
+							tbl7.ImmuneShurikens[k] = nil
 
-							if not (stickyPart and stickyWeld2) or not tbl12.SNO(stickyPart) then
-								tbl12.DestroyToy(NinjaShuriken)
-							else
-								task.spawn(function()
-									local touchInterest = stickyPart:WaitForChild("TouchInterest", 2.5)
+							if immunePreset.Toy == "NinjaKatana" then
+								local spawnCFrame = (v23.CFrame + Vector3.new(0, 15, 0)) * immuneKatanaSpawnRotation
+								local katana = tbl12.SpawnToy("NinjaKatana", spawnCFrame, 3, true)
+								local newStickyPart = katana and katana:WaitForChild("StickyPart", 1.5)
+								local newStickyWeld = newStickyPart and newStickyPart:WaitForChild("StickyWeld", 1.5)
 
-									if touchInterest then
-										touchInterest:Destroy()
+								if not (katana and newStickyPart and newStickyWeld and tbl12.SNO(newStickyPart)) then
+									if katana then
+										tbl12.DestroyToy(katana)
 									end
-								end)
+								else
+									task.spawn(function()
+										local touchInterest = newStickyPart:WaitForChild("TouchInterest", 2.5)
+										if touchInterest then
+											touchInterest:Destroy()
+										end
+									end)
 
-								tbl11.StickyPartEvent:FireServer(stickyPart, ragdollTouchedHitbox, CFrame.new(0, -0.3, 0) * CFrame.Angles(1.5707963267948966, 0, 0))
-								local now3 = tick()
+									local startedAt = tick()
+									pcall(function()
+										tbl11.StickyPartEvent:FireServer(newStickyPart, targetTorso, targetTorso.CFrame:ToObjectSpace(ragdollTouchedHitbox.CFrame) * immuneStick)
+									end)
 
-								while true do
-									fn20()
-									if not (stickyWeld2.Part1 == ragdollTouchedHitbox or not stickyWeld2.Parent or not ragdollTouchedHitbox.Parent or not v26.Parent or v26.Health == 0 or tick() - now3 > 0.5) then
-										continue
+									while true do
+										fn20()
+										local onBack = newStickyWeld.Parent and (newStickyWeld.Part0 == targetTorso or newStickyWeld.Part1 == targetTorso)
+										local invalid = not newStickyWeld.Parent or not targetTorso.Parent or not v25.Parent or not v26.Parent or v26.Health <= 0
+										if onBack or invalid or tick() - startedAt > 0.5 then
+											break
+										end
+										task.wait()
 									end
-									break
+
+									if newStickyWeld.Parent and (newStickyWeld.Part0 == targetTorso or newStickyWeld.Part1 == targetTorso)
+										and tbl8.ImmunityAntiKick and not flag11 then
+										tbl7.ImmuneShurikens[k] = katana
+									else
+										tbl12.DestroyToy(katana)
+									end
 								end
+							elseif immuneOnTorso then								local spawnCFrame = (v23.CFrame + Vector3.new(0, 15, 0)) * immunePencilSpawnRotation
+								local toy = tbl12.SpawnToy(immunePreset.Toy, spawnCFrame, 3, true)
+								local newStickyPart = toy and toy:WaitForChild("StickyPart", 2.5)
+								local newStickyWeld = newStickyPart and newStickyPart:WaitForChild("StickyWeld", 2.5)
+								local soundPart = toy and toy:FindFirstChild("SoundPart")
 
-								tbl7.ImmuneShurikens[k] = NinjaShuriken
+								if not (toy and newStickyPart and newStickyWeld) then
+									if toy then
+										tbl12.DestroyToy(toy)
+									end
+								else
+									tbl12.OwnershipBurst({ soundPart or newStickyPart }, true)
+									pcall(function()
+										tbl11.StickyPartEvent:FireServer(newStickyPart, targetTorso, targetTorso.CFrame:ToObjectSpace(ragdollTouchedHitbox.CFrame) * immuneStick)
+									end)
+
+									local startedAt = tick()
+									local attached = false
+									while tick() - startedAt < 1.5 do
+										if not (newStickyWeld.Parent and toy.Parent and targetTorso.Parent and tbl8.ImmunityAntiKick and not flag11) then
+											break
+										end
+										if newStickyWeld.Part0 == targetTorso or newStickyWeld.Part1 == targetTorso then
+											attached = true
+											break
+										end
+										task.wait(0.05)
+									end
+
+									if attached then
+										pcall(function()
+											for _, child in ipairs(newStickyPart:GetChildren()) do
+												if child:IsA("TouchTransmitter") or child.Name == "TouchInterest" then
+													child:Destroy()
+												end
+											end
+										end)
+										tbl7.ImmuneShurikens[k] = toy
+									else
+										tbl12.DestroyToy(toy)
+									end
+								end
+							else
+								local NinjaShuriken = tbl12.SpawnToy(immunePreset.Toy)
+								local stickyPart = NinjaShuriken and NinjaShuriken:WaitForChild("StickyPart", 1.5)
+								local stickyWeld2 = stickyPart and stickyPart:WaitForChild("StickyWeld", 1.5)
+
+								if not (stickyPart and stickyWeld2) or not tbl12.SNO(stickyPart) then
+									tbl12.DestroyToy(NinjaShuriken)
+								else
+									task.spawn(function()
+										local touchInterest = stickyPart:WaitForChild("TouchInterest", 2.5)
+
+										if touchInterest then
+											touchInterest:Destroy()
+										end
+									end)
+
+									tbl11.StickyPartEvent:FireServer(stickyPart, ragdollTouchedHitbox, immuneStick)
+									local now3 = tick()
+
+									while true do
+										fn20()
+										if not (stickyWeld2.Part1 == ragdollTouchedHitbox or not stickyWeld2.Parent or not ragdollTouchedHitbox.Parent or not v26.Parent or v26.Health == 0 or tick() - now3 > 0.5) then
+											continue
+										end
+										break
+									end
+
+									tbl7.ImmuneShurikens[k] = NinjaShuriken
+								end
 							end
 						end
 					end
@@ -36799,14 +36855,12 @@ Escape Timer: %*]]
 
 		lib.ForceCheckbox = true
 
-		-- Savitar-style UI shell (same Obsidian window settings / look)
-		-- force Savitar palette before window
 		lib.Scheme.BackgroundColor = Color3.fromHex("19191c")
 		lib.Scheme.MainColor = Color3.fromHex("262729")
 		lib.Scheme.AccentColor = Color3.fromHex("ffffff")
 		lib.Scheme.OutlineColor = Color3.fromHex("373a3d")
 		lib.Scheme.FontColor = Color3.fromHex("ffffff")
-		lib.Scheme.Font = Font.fromEnum(Enum.Font.Gotham)
+		lib.Scheme.Font = Font.fromEnum(Enum.Font.Roboto)
 		lib.CornerRadius = 10
 		lib.IsLightTheme = false
 
@@ -36814,8 +36868,8 @@ Escape Timer: %*]]
 			Title = "<b>HuiG</b>",
 			Icon = huiGLogoAsset,
 			IconSize = UDim2.fromOffset(30, 30),
-			Footer = "<b>HuiG Custom V1.3</b>",
-			Font = Enum.Font.Gotham,
+			Footer = "<b>HuiG Custom V1.4</b>",
+			Font = Enum.Font.Roboto,
 			NotifySide = "Right",
 			ShowCustomCursor = true,
 			ToggleKeybind = Enum.KeyCode.RightControl,
@@ -36844,7 +36898,7 @@ Escape Timer: %*]]
 			TabButtonsStyle = {
 				Gap = 0,
 				Padding = 0,
-				CornerRadius = 10, -- Savitar-style rounded selected tab
+				CornerRadius = 10,
 				Indicator = false,
 				IndicatorWidth = 2,
 				IndicatorHeight = 20,
@@ -36863,7 +36917,6 @@ Escape Timer: %*]]
 			end
 		end)
 
-		-- Savitar 1:1 tab transition (Quart, not library default Quad)
 		lib.TabTransitionInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 		lib.TabSwipeOffset = 24
 		lib.TabSwipeFrom = "auto"
@@ -36875,7 +36928,6 @@ Escape Timer: %*]]
 		lib.Animations.ToggleWindow = false
 		lib.CornerRadius = 10
 
-		-- Force every UICorner to Savitar radius 10
 		local function applySavitarCorners(root)
 			if not root then return end
 			for _, d in ipairs(root:GetDescendants()) do
@@ -36908,7 +36960,6 @@ Escape Timer: %*]]
 			end)
 		end
 
-		-- Also fix tab button corners already created (selected pill)
 		task.defer(function()
 			pcall(function()
 				for _, entry in pairs(lib.TabButtons or {}) do
@@ -36923,7 +36974,6 @@ Escape Timer: %*]]
 			end)
 		end)
 
-		-- Savitar: rich text + corner radius on all UI
 		if lib.ScreenGui then
 			local function enableRichText(obj)
 				if obj:IsA("TextLabel") or obj:IsA("TextButton") then
@@ -36972,7 +37022,6 @@ Escape Timer: %*]]
 			end
 		end)
 
-		-- ===== Savitar UI: tab whoosh + icon bounce + smooth tab swap =====
 		do
 			local TweenService = game:GetService("TweenService")
 			local SoundService = game:GetService("SoundService")
@@ -37011,7 +37060,6 @@ Escape Timer: %*]]
 			local function savitarFeatureOn(name)
 				local option = lib and lib.Options and lib.Options.AdditionalFeaturesDropdown
 				if not option then
-					-- Keep the Savitar-style effects enabled during initial window creation.
 					return true
 				end
 				local value = option.Value
@@ -37246,10 +37294,6 @@ Escape Timer: %*]]
 				end
 			end
 
-			-- Preserve ResoCustom/Obsidian's native swipe engine; layer the Savitar
-			-- whoosh and icon reactions around it. The older replacement implementation
-			-- could suppress the actual transition when the multi-select option returned
-			-- an unexpected value shape.
 			local nativePlayTabAnimation = lib.PlayTabAnimation
 			lib.PlayTabAnimation = function(self, tab, visible)
 				if type(nativePlayTabAnimation) == "function" then
@@ -37288,7 +37332,6 @@ Escape Timer: %*]]
 				end
 			end
 
-			-- Savitar menu-style gradients: animated outline, theme accent, chroma and presets.
 			local activeMenuStyle = nil
 			local menuStyleConnection = nil
 			local menuStyleStroke = nil
@@ -37368,7 +37411,6 @@ Escape Timer: %*]]
 				if not menuStyleConnection then
 					menuStyleConnection = RunService.RenderStepped:Connect(function(deltaTime)
 						if not activeMenuStyle or not menuStyleGradient or not menuStyleGradient.Parent or not menuStyleStroke or not menuStyleStroke.Parent then return end
-						-- Gradient motion does not need to mutate UI properties at the game's full frame rate.
 						menuStyleUpdateAccumulator += deltaTime
 						if menuStyleUpdateAccumulator < (1 / 30) then return end
 						menuStyleUpdateAccumulator %= (1 / 30)
@@ -37394,7 +37436,6 @@ Escape Timer: %*]]
 			end
 			tbl12.SetSavitarMenuStyle = setSavitarMenuStyle
 
-			-- Cancel Savitar motion effects and dispose the shared tab sound on unload.
 			if lib.OnUnload then
 				lib:OnUnload(function()
 					clearChain()
@@ -37509,12 +37550,10 @@ Escape Timer: %*]]
 
 		Watermark = lib:AddDraggableLabel("HuiG Custom", huiGLogoAsset)
 		Watermark:SetVisible(true)
-		-- Default position: horizontally centered, slightly below the top edge.
 		pcall(function()
 			Watermark.Label.AnchorPoint = Vector2.new(0.5, 0)
 			Watermark.Label.Position = UDim2.new(0.5, 0, 0, 28)
 			Watermark.Label.RichText = true
-			-- a little more breathing room than the library default
 			local padding = Watermark.Label:FindFirstChildOfClass("UIPadding")
 			if padding then
 				padding.PaddingTop = UDim.new(0, 7)
@@ -37522,16 +37561,15 @@ Escape Timer: %*]]
 			end
 		end)
 
-		-- Watermark style. Every field is set from the Watermark box in Settings.
 		local WATERMARK_TEXT_ELEMENTS = { "HuiG Custom", "Script Version", "FPS", "Ping", "Time", "Date", "Session", "Players", "Memory", "Account", "Display Name", "Game" }
 		local wmStyle = {
 			Order = table.clone(WATERMARK_TEXT_ELEMENTS),
 			Separator = "·",
 			Clock = "24h",
-			Seconds = true,
-			QualityColors = true,
+			Seconds = false,
+			QualityColors = false,
 			Font = "Theme",
-			Corner = nil, -- nil = theme corner radius
+			Corner = nil,
 			CustomColors = false,
 			TextColor = Color3.new(1, 1, 1),
 			AccentColor = Color3.new(1, 1, 1),
@@ -37550,8 +37588,6 @@ Escape Timer: %*]]
 			end
 		end)
 
-		-- Rich text: values stand out, units and separators are dimmed, FPS / ping are
-		-- colored by quality. The label auto-sizes, so tags don't affect its width.
 		local WATERMARK_GOOD = Color3.fromRGB(110, 220, 140)
 		local WATERMARK_OK = Color3.fromRGB(240, 200, 90)
 		local WATERMARK_BAD = Color3.fromRGB(240, 95, 95)
@@ -37580,7 +37616,7 @@ Escape Timer: %*]]
 			if name == "HuiG Custom" then
 				return "<b>HuiG Custom</b>"
 			elseif name == "Script Version" then
-				return wmColor(accent, "<b>V1.3</b>")
+				return wmColor(accent, "<b>V1.4</b>")
 			elseif name == "FPS" then
 				return wmValue(wmQuality(fps, 55, 30, true), tostring(fps)) .. " " .. wmDim("fps")
 			elseif name == "Ping" then
@@ -37630,7 +37666,6 @@ Escape Timer: %*]]
 			return table.concat(parts, separator)
 		end
 
-		-- Colors, font and corners. Re-applied every update so theme changes can't undo them.
 		local function applyWatermarkLook()
 			local label = Watermark and Watermark.Label
 			if not label then return end
@@ -37662,7 +37697,6 @@ Escape Timer: %*]]
 			if not stroke then return false end
 			local gradient = stroke:FindFirstChild("HuiGWatermarkChroma")
 			if enabled then
-				-- Outline = black; wave highlight = pure white (stroke must stay white or gradient looks grey)
 				local darker = Color3.new(0, 0, 0)
 				local white = Color3.new(1, 1, 1)
 				local seq = ColorSequence.new({
@@ -37682,7 +37716,7 @@ Escape Timer: %*]]
 				stroke.Enabled = true
 				stroke.Thickness = 1.8
 				stroke.Transparency = 0
-				stroke.Color = Color3.new(1, 1, 1) -- required: multiplies with gradient
+				stroke.Color = Color3.new(1, 1, 1)
 				return true
 			else
 				if gradient then gradient.Enabled = false; gradient:Destroy() end
@@ -37696,7 +37730,6 @@ Escape Timer: %*]]
 			local on = enabled == true
 			local label = Watermark and Watermark.Label
 			local stroke = label and label:FindFirstChildOfClass("UIStroke")
-			-- Always re-apply while on so config/theme load cannot leave a dark/grey stroke
 			if on then
 				if not stroke and label then
 					stroke = Instance.new("UIStroke")
@@ -37714,7 +37747,6 @@ Escape Timer: %*]]
 					local currentStroke = Watermark and Watermark.Label and Watermark.Label:FindFirstChildOfClass("UIStroke")
 					local currentGradient = currentStroke and currentStroke:FindFirstChild("HuiGWatermarkChroma")
 					if currentStroke and currentGradient and currentGradient.Enabled then
-						-- keep stroke pure white so white keypoints stay white after config load
 						if currentStroke.Color ~= Color3.new(1, 1, 1) then
 							currentStroke.Color = Color3.new(1, 1, 1)
 						end
@@ -37723,7 +37755,6 @@ Escape Timer: %*]]
 						end
 						currentGradient.Rotation = (os.clock() * (watermarkChromaSpeed or 120)) % 360
 					elseif watermarkChromaState then
-						-- stroke missing after reload — reattach
 						applyWatermarkChroma(true)
 					end
 				end)
@@ -37770,7 +37801,6 @@ Escape Timer: %*]]
 			applyWatermarkLook()
 		end
 
-		-- Publish the local helpers because Settings is built in a separate scope below.
 		tbl12.WatermarkElementOptions = table.clone(watermarkElementOptions)
 		tbl12.WatermarkElementDefaults = table.clone(watermarkElementDefaults)
 		tbl12.SetWatermarkElements = function(value)
@@ -37787,8 +37817,6 @@ Escape Timer: %*]]
 			wmStyle[key] = value
 			applyWatermarkElements()
 		end
-		-- Accepts "FPS, Ping, Time" (any case) or a list; unknown names are dropped and
-		-- missing ones are appended in default order. Returns the order as text.
 		tbl12.SetWatermarkOrder = function(value)
 			local canonical = {}
 			for _, name in ipairs(WATERMARK_TEXT_ELEMENTS) do canonical[name:lower()] = name end
@@ -37859,12 +37887,10 @@ Escape Timer: %*]]
 		end
 
 		tbl12.ApplyWatermarkStyle = function()
-			-- One supported style: HuiG Custom. Ignore any legacy saved style.
 			tbl9.WatermarkStyle = "HuiG Custom"
 			applyWatermarkElements()
 		end
 
-		-- Apply the default size immediately; later slider changes use the same callback.
 		task.defer(function()
 			applyWatermarkSize((options.WatermarkSize and options.WatermarkSize.Value) or tbl9.WatermarkSize or 6)
 		end)
@@ -37894,7 +37920,6 @@ Escape Timer: %*]]
 			Toys = v19:AddTab("<b>Toys</b>", "shapes", "Actions you can do with Toys"),
 			ToysForms = v19:AddTab("<b>Peak Toys</b>", "shapes", "Coconut forms and body props"),
 			Visual = v19:AddTab("<b>Visual</b>", "eye", "Stuff only you can see"),
-			-- Peak Visuals lives under Visual via in-tab switcher (no extra sidebar icon)
 			PeakVisuals = v19:AddTab("<b>Peak Visuals</b>", "sparkles", "HuiG Custom visuals: Shader / Beach"),
 			AutoClicker = v19:AddTab("<b>Auto-Clicker</b>", "mouse-pointer-click", "Make figures out of players"),
 			Keybinds = v19:AddTab("<b>Keybinds</b>", "keyboard", "Keybinds you can press for specific action"),
@@ -37903,7 +37928,6 @@ Escape Timer: %*]]
 			Settings = v19:AddTab("<b>Settings</b>", "settings", "GUI Settings"),
 		}
 
-		-- Hide Peak Visuals from the sidebar tabbar (in-content sub-tabs instead)
 		pcall(function()
 			for _, tab in ipairs({ tbl15.PeakVisuals, tbl15.ToysForms }) do
 				if tab then
@@ -37916,10 +37940,6 @@ Escape Timer: %*]]
 			end
 		end)
 
-		-- ============================================================
-		-- Dual header icons: Visual/Peak Visuals + Toys/Peak Toys
-		-- Manual container swap (no fragile Tab:Show reliance)
-		-- ============================================================
 		do
 			local TweenService = game:GetService("TweenService")
 			local scheme = lib.Scheme or {}
@@ -37958,7 +37978,6 @@ Escape Timer: %*]]
 			}
 
 			local state = {
-				-- Key -> "A" | "B"
 				Active = { Visual = "A", Toys = "A" },
 				Holders = {},
 				Installed = false,
@@ -37986,9 +38005,6 @@ Escape Timer: %*]]
 					return
 				end
 				pcall(function()
-					-- Always keep the button background transparent. Selection is drawn
-					-- by the Savitar spring indicator; BackgroundTransparency = 0 paints
-					-- a solid MainColor pill that looks like a stuck gray selection.
 					tab.Button.BackgroundTransparency = 1
 					local icon = tab.Button:FindFirstChildWhichIsA("ImageLabel", true)
 					if icon then
@@ -38079,7 +38095,6 @@ Escape Timer: %*]]
 					end
 				end
 
-				-- Sidebar: always treat PRIMARY as the selected tab visually
 				forceSidebarLook(primary, true)
 				if secondary then
 					forceSidebarLook(secondary, false)
@@ -38090,7 +38105,6 @@ Escape Timer: %*]]
 					end
 				end)
 
-				-- Keep library ActiveTab on primary so sidebar state stays sane
 				pcall(function()
 					if Library then
 						Library.ActiveTab = primary
@@ -38099,7 +38113,6 @@ Escape Timer: %*]]
 
 				paintHolder(cfg.Key, which)
 				setHolderVisible(cfg.Key, true)
-				-- hide other pairs completely (icons + both containers)
 				for _, other in ipairs(pairsConfig) do
 					if other.Key ~= cfg.Key then
 						setHolderVisible(other.Key, false)
@@ -38213,7 +38226,6 @@ Escape Timer: %*]]
 				state.Installed = true
 			end
 
-			-- When user clicks a PRIMARY sidebar tab, show primary page + header icons
 			local function hookPrimarySidebar(cfg)
 				local primary = cfg.GetPrimary()
 				if not primary or not primary.Button then
@@ -38222,7 +38234,6 @@ Escape Timer: %*]]
 				primary.Button.MouseButton1Click:Connect(function()
 					task.defer(function()
 						pcall(installHolders)
-						-- library already showed primary; ensure secondary hidden
 						local secondary = cfg.GetSecondary()
 						setContainerVisible(secondary, false)
 						setContainerVisible(primary, true)
@@ -38253,7 +38264,6 @@ Escape Timer: %*]]
 					pcall(hookPrimarySidebar, cfg)
 				end
 
-				-- Hook ShowTabInfo only to show/hide the right icon pair
 				if v19 and v19.ShowTabInfo then
 					local oldShow = v19.ShowTabInfo
 					v19.ShowTabInfo = function(self, name, description)
@@ -38274,11 +38284,6 @@ Escape Timer: %*]]
 								paintHolder(cfg.Key, which)
 								forceSidebarLook(cfg.GetPrimary(), true)
 							else
-								-- Leaving this pair: hide header switcher AND both
-								-- page containers. Peak (secondary) containers are
-								-- toggled manually and are NOT cleaned up by the
-								-- library Tab:Hide path because ActiveTab is forced
-								-- onto the primary tab while Peak is showing.
 								setHolderVisible(cfg.Key, false)
 								setContainerVisible(cfg.GetPrimary(), false)
 								setContainerVisible(cfg.GetSecondary(), false)
@@ -38291,8 +38296,6 @@ Escape Timer: %*]]
 			end)
 		end
 
-	-- Savitar-style floating tab indicator: one spring highlight travels between
-	-- actual sidebar buttons instead of drawing independent glow cards on every tab.
 	task.spawn(function()
 		local screenGui, main, nav
 		for _ = 1, 100 do
@@ -38450,8 +38453,6 @@ Escape Timer: %*]]
 			if not (button and button:IsA("TextButton") and button.Parent) then return end
 			local previous = activeButton
 			if previous == button then
-				-- Click + Tab:Show can both report the same tab. Do not restart or cancel
-				-- an in-flight spring tween for duplicate notifications.
 				if instant then positionIndicator(button, true) end
 				return
 			end
@@ -38549,7 +38550,6 @@ Escape Timer: %*]]
 		pcall(function()
 			Greetings:SetDescription("Greetings")
 		end)
-		-- Savitar-style full-body avatar
 		local thumbnail = string.format("rbxthumb://type=AvatarThumbnail&id=%d&w=420&h=420", localPlayer.UserId)
 		local avatar = Greetings:AddImage("MyIcon", {
 			Image = thumbnail,
@@ -38597,7 +38597,7 @@ Escape Timer: %*]]
 		elseif hour >= 17 and hour < 21 then
 			greeting = "Evening"
 		end
-		Greetings:AddLabel({ Text = "<b>HuiG Custom V1.3</b>", DoesWrap = true, Size = 20 })
+		Greetings:AddLabel({ Text = "<b>HuiG Custom V1.4</b>", DoesWrap = true, Size = 20 })
 		Greetings:AddLabel({ Text = ("Good %s, <b>%s</b>."):format(greeting:lower(), localPlayer.DisplayName), DoesWrap = true })
 		Greetings:AddLabel({ Text = "Thanks for using HuiG Custom!", DoesWrap = true })
 		Greetings:AddDivider("Quick Access")
@@ -38614,31 +38614,29 @@ Escape Timer: %*]]
 				pcall(function() tbl15.Settings:Show() end)
 			end,
 		})
-		-- Changelog: one tabbox with three tabs (Added / Changed / Fixed), each holding a scrollable text box.
-		-- Edit this table for each release.
 		local Changelog = {
-			Version = "HuiG Custom V1.3",
+			Version = "HuiG Custom V1.4",
 			Added = {
-				"Blobman Target Settings: Auto Sit follows your target",
-				"Blobman Target Settings: Remove Blobman when Auto Sit turns off",
-				"Icons for Target and Blobman methods",
-				"Watermark elements: Date, Session, Players, Memory, Display Name, Game",
-				"Watermark customisation: colors, font, separator, clock, position, element order",
-				"Anti Kick [Item] is hidden in first person and can't be clicked",
+				"Cape (Peak Visuals): client-sided cloth cape with the HuiG logo, neon rim with gliding light comets and a logo shine",
+				"More Anti-Kick presets",
+				"Custom Anti-Kick customization",
+				"Liquid-Glass Toy Menu: search bar with aliases (e.g. sofa, rocket, tetris)",
+				"Liquid-Glass Toy Menu: Favorites tab that shows only your favorited toys",
+				"Target Preview: SNO indicator that lights up when you have network ownership of the target",
+				"Anti-Grab: Allow Whitelisted Grabs option",
+				"Auto Reset: Flags Before Reset, Flag Reset Timer and Flags Before Leaving sliders",
+				"Give Anti-Kick (Lists): choose any Built-In or Saved Anti-Kick preset instead of only the Shuriken",
 			},
 			Changed = {
-				"Redesigned Home tab (Welcome, Overview, Server, Changelog)",
-				"Redesigned watermark (colored FPS / Ping, cleaner look)",
-				"Redesigned Keyboard Free Keys window",
-				"Tabbed layouts: Invincibility, Anti-Kick, Toys Aura, Experimental, Anchor System, Blobman",
-				"Settings: Watermark box and Specialties (Command Bar / Action Wheel)",
-				"Pencil Anti-Kick / Pencil Control grab before sticking",
+				"Target Preview redesigned: avatar header, alive badge, distance badge and stat cards",
+				"Invincibility Config reworked: Anti-Grab type icons, Auto Anti Lag and FPS Threshold under Anti-Lag, toy names and icons under Anti Net-Owner",
+				"Config and Anti-Kick sliders now show their value inside the bar",
+				"Roboto is now the default menu font",
+				"Target Preview friend count refreshes less often for smoother performance",
 			},
 			Fixed = {
-				"Pencil not sticking sometimes",
-				"Disable Void: turning it off used the wrong void height",
-				"Disable Void: void stayed off after running the script twice",
-				"Disable Void: toggle could get stuck greyed out",
+				"Mouse cursor no longer shows all the time; it only appears in the toy menu, with Unlock Mouse or while typing",
+				"Anti Kick [Item] flame and effects are now hidden in first person",
 			},
 		}
 
@@ -38682,7 +38680,7 @@ Escape Timer: %*]]
 			padding.Parent = scroller
 
 			local list = Instance.new("UIListLayout")
-			list.Padding = UDim.new(0, 6) -- a little air between entries
+			list.Padding = UDim.new(0, 6)
 			list.SortOrder = Enum.SortOrder.LayoutOrder
 			list.Parent = scroller
 
@@ -38711,7 +38709,7 @@ Escape Timer: %*]]
 		ChangelogGroup:AddLabel({ Text = ("<b>%s</b>"):format(Changelog.Version), DoesWrap = true, Size = 16 })
 		local ChangelogBox = ChangelogGroup:AddTabbox({ PopOut = false })
 		addChangelogTab(ChangelogBox, "Added", "plus", Changelog.Added)
-		addChangelogTab(ChangelogBox, "Changed", "refresh-cw", Changelog.Changed)
+		addChangelogTab(ChangelogBox, "Changed", "refresh-ccw", Changelog.Changed)
 		addChangelogTab(ChangelogBox, "Fixed", "wrench", Changelog.Fixed)
 		end
 
@@ -38725,7 +38723,6 @@ Escape Timer: %*]]
 			end)
 			pcall(function()
 				Statistics:AddImage("GameBanner", {
-					-- 16:9 place thumbnail fits the wide box; the square GameIcon got cut off.
 					Image = ("rbxthumb://type=Asset&id=%d&w=768&h=432"):format(game.PlaceId),
 					Height = 150,
 					Color = Color3.new(1, 1, 1),
@@ -38744,7 +38741,7 @@ Escape Timer: %*]]
 					pcall(function() gameNameLbl:SetText("<b>" .. safeName .. "</b>") end)
 				end
 			end)
-			Statistics:AddLabel("VerLabel", { Text = "Build: <b>V1.3</b>", DoesWrap = true })
+			Statistics:AddLabel("VerLabel", { Text = "Build: <b>V1.4</b>", DoesWrap = true })
 			Statistics:AddDivider("This Session")
 			Statistics:AddLabel("CurrentTime", { Text = "Local time: <b>--:--</b>", DoesWrap = true })
 			Statistics:AddLabel("SpentTime", { Text = "Session time: <b>0m 0s</b>", DoesWrap = true })
@@ -38756,7 +38753,6 @@ Escape Timer: %*]]
 			local _fpsLbl = Usage:AddLabel("FPSLabel", { Text = "FPS: <b>--</b>", DoesWrap = true })
 			local _pingLbl = Usage:AddLabel("PingLabel", { Text = "Ping: <b>-- ms</b>", DoesWrap = true })
 
-			-- How many times the script was run, kept in a file in the executor workspace.
 			local executions = nil
 			pcall(function()
 				local path = "HuiGCustom_Executions.txt"
@@ -38778,7 +38774,6 @@ Escape Timer: %*]]
 					end)
 				end
 			end)
-			-- Savitar-style live FPS / Ping
 			task.spawn(function()
 				local frames = 0
 				local last = tick()
@@ -38808,7 +38803,6 @@ Escape Timer: %*]]
 					pcall(function()
 						local n = #game:GetService("Players"):GetPlayers()
 						if options and Statistics then
-							-- update players label if SetText available via registry
 						end
 					end)
 				end
@@ -38881,6 +38875,7 @@ Escape Timer: %*]]
 
 			Script:AddButton({
 				Text = "Unload Script",
+				Icon = "power",
 				Func = function()
 					lib:Unload()
 				end,
@@ -38889,6 +38884,7 @@ Escape Timer: %*]]
 
 			Script:AddButton({
 				Text = "Rejoin",
+				Icon = "rotate-cw",
 				Func = function()
 					tbl12.Rejoin(tbl8.RejoinWithAntiLag ~= false, tbl8.RejoinWithScript)
 				end,
@@ -38897,6 +38893,7 @@ Escape Timer: %*]]
 
 			tbl7.ServerHop.Button = Script:AddButton({
 				Text = "Server-hop",
+				Icon = "shuffle",
 				Func = function()
 					if tbl7.ServerHop.Busy or tbl7.ServerHop.Pending or tbl7.ServerHop.Retrying then
 						tbl12.CancelServerHop()
@@ -39292,7 +39289,6 @@ Escape Timer: %*]]
 				SpawnLocation = "shell",
 				TudorHouse = "rbxassetid://8989327148",
 				PinkRoofHouse = "rbxassetid://8989326312",
-				-- The waypoint is named SpookyHouse in ResoCustom, while Savitar calls it HauntedHouse.
 				SpookyHouse = "rbxassetid://9909725942",
 				HauntedHouse = "rbxassetid://9909725942",
 				GlassHouse = "rbxassetid://8989330316",
@@ -39300,7 +39296,6 @@ Escape Timer: %*]]
 				JapaneseHouse = "rbxassetid://9108988013",
 				BlueHouse = "rbxassetid://9909733734",
 				Barn = "rbxassetid://8989332406",
-				-- Reuse the exact Train thumbnail from the GUCCI Type dropdown.
 				Train = "rbxassetid://8989324783",
 			}
 			for _, location in ipairs(tbl7.TeleportLocations) do
@@ -39583,7 +39578,6 @@ Escape Timer: %*]]
 				end
 			end)
 
-			-- ===== Dance V2 (ported from PoopHub) =====
 			Animations:AddDivider("Dance V2")
 
 			local danceV2 = {
@@ -39643,7 +39637,6 @@ Escape Timer: %*]]
 				local hrp = char:FindFirstChild("HumanoidRootPart")
 				local hum = char:FindFirstChildOfClass("Humanoid")
 
-				-- residual duration is short (we only ever arm ~0.75s), cancel it
 				if hrp and tbl11 and tbl11.RagdollRemote then
 					for _ = 1, 5 do
 						pcall(function()
@@ -39737,11 +39730,9 @@ Escape Timer: %*]]
 				if hipHeight < 1 then
 					hipHeight = 2
 				end
-				-- enough clearance for feet in emote poses; no per-part anti-sink (hills)
 local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				local lockedY = hrp.Position.Y
 
-				-- old working pulse values
 				local RAGDOLL_PULSE = 0.75
 				local function armRagdoll()
 					if hrp and hrp.Parent and tbl11 and tbl11.RagdollRemote then
@@ -39803,7 +39794,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					if md.Magnitude > 0.01 then
 						position = position + Vector3.new(md.X, 0, md.Z) * walkSpeed * dt
 					end
-					-- keep original height — no float, no sink
 					position = Vector3.new(position.X, lockedY, position.Z)
 
 					local base = CFrame.new(position) * CFrame.Angles(0, yaw, 0)
@@ -39811,17 +39801,15 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					hrp.AssemblyLinearVelocity = Vector3.zero
 					hrp.AssemblyAngularVelocity = Vector3.zero
 
-					-- continuous phase over full clip (seamless loop, no hard restart)
 					danceV2.frameTimer = danceV2.frameTimer + dt
 					local totalTime = interval * frameCount
 					if totalTime <= 0 then
 						totalTime = interval
 					end
-					-- keep timer in [0, totalTime)
 					if danceV2.frameTimer >= totalTime then
 						danceV2.frameTimer = danceV2.frameTimer % totalTime
 					end
-					local phase = danceV2.frameTimer / interval -- 0 .. frameCount
+					local phase = danceV2.frameTimer / interval
 					local i0 = math.floor(phase) + 1
 					local alpha = phase - math.floor(phase)
 					if i0 > frameCount then
@@ -39872,7 +39860,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				if ok and type(data) == "table" then
 					return data
 				end
-				-- some files may be Lua returning a table
 				ok, data = pcall(function()
 					local fn = loadstring(raw)
 					return fn and fn()
@@ -39884,14 +39871,12 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end
 
 			local function danceV2BuiltInR6()
-				-- Procedural R6 emotes in the same { interval, frames = { { parts = { [name] = {12 cf comps} } } } } format
 				local function cfArr(cf)
 					local x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 = cf:GetComponents()
 					return { x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 }
 				end
 
 				local function pose(t, arms, legs, head, torso)
-					-- arms/legs/head/torso are CFrames relative to HRP
 					return {
 						parts = {
 							Torso = cfArr(torso or CFrame.new(0, 0, 0)),
@@ -39979,7 +39964,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					end
 				end
 
-				-- always inject built-in R6 popular-style dances
 				local builtins = danceV2BuiltInR6()
 				for name, data in pairs(builtins) do
 					if danceV2.currentRaw[name] == nil then
@@ -40377,7 +40361,20 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				"Infinite",
 				"Noclip",
 			},
-			Multi = true,
+			ValueImages = {
+				Invisible = "eye-off",
+				Kill = "skull",
+				Void = "circle-dashed",
+				Kick = "user-round-x",
+				Spin = "hand-grab",
+				Fling = "wind",
+				["Teleport to Spawn"] = "locate-fixed",
+				Unstick = "unlink",
+				Ragdoll = "person-standing",
+				Massless = "feather",
+				Infinite = "infinity",
+				Noclip = "scan",
+			},			Multi = true,
 			AllowNull = true,
 			Searchable = true,
 			Text = "Grabs",
@@ -40435,7 +40432,23 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				"Blob-Kick",
 				"Sex",
 			},
-			Multi = true,
+			ValueImages = {
+				Kill = "skull",
+				Void = "circle-dashed",
+				["Kick [Slow]"] = "user-round-x",
+				Fling = "wind",
+				Sky = "cloud",
+				["Delete Limbs"] = "trash-2",
+				["Teleport to Spawn"] = "locate-fixed",
+				Grab = "hand-grab",
+				Anchor = "anchor",
+				Unstick = "unlink",
+				Ragdoll = "person-standing",
+				["Banana Ragdoll"] = "banana",
+				["Blob-Grab"] = "hand-grab",
+				["Blob-Kill"] = "skull",
+				["Blob-Kick"] = "user-round-x",
+			},			Multi = true,
 			AllowNull = true,
 			Searchable = true,
 			Text = "Auras",
@@ -40684,6 +40697,29 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 						local RunService = game:GetService("RunService")
 						local destroyToy = RS:FindFirstChild("MenuToys") and RS.MenuToys:FindFirstChild("DestroyToy")
 						local warpSpeed = 15
+						local akEffects = setmetatable({}, { __mode = "k" })
+						local akLastFirstPerson, akLastItem = nil, nil
+						local function setItemEffects(item, hidden)
+							for _, v in ipairs(item:GetDescendants()) do
+								if v:IsA("ParticleEmitter") or v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Sparkles")
+									or v:IsA("Beam") or v:IsA("Trail") or v:IsA("Light") or v:IsA("LayerCollector") or v:IsA("Highlight") then
+									if hidden then
+										if akEffects[v] == nil then
+											akEffects[v] = v.Enabled
+										end
+										v.Enabled = false
+										if v:IsA("ParticleEmitter") then
+											v:Clear()
+										end
+									elseif akEffects[v] ~= nil then
+										v.Enabled = akEffects[v]
+										akEffects[v] = nil
+									end
+								elseif v:IsA("Decal") then
+									v.LocalTransparencyModifier = hidden and 1 or 0
+								end
+							end
+						end
 						while tbl8.AntiKickItem and not flag11 do
 							local dt = task.wait()
 							local char = localPlayer.Character
@@ -40703,7 +40739,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 										pcall(function() if destroyToy then destroyToy:FireServer(v) end end)
 									end
 								end
-								-- spawn SpookyCandle1 only
 								local spawnCF = hrp.CFrame * CFrame.new(0, 14, 20)
 								Item = tbl12.SpawnToy("SpookyCandle1", spawnCF, 3, true)
 								if not Item then continue end
@@ -40714,7 +40749,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 								for _, v in pairs(Item:GetDescendants()) do
 									if v:IsA("BasePart") then
 										v.CanCollide = false
-										-- not clickable: mouse / grab raycasts pass through it
 										v.CanQuery = false
 										v.Transparency = 0.8
 										v.Color = Color3.fromRGB(0, 255, 255)
@@ -40726,7 +40760,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 							end
 
 							if SoundPart and SoundPart.Parent and hrp then
-								-- stick to PCLD if present, else FirePlayerPart, else HRP (Revenge behavior)
 								local targetPart = nil
 								if tbl12.DetectPCLD then
 									local pcld = tbl12.DetectPCLD(localPlayer)
@@ -40747,11 +40780,11 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 								end
 							end
 
-							-- Hide the candle for you while you're in first person.
 							if Item and Item.Parent then
 								local camera = workspace.CurrentCamera
 								local head = char:FindFirstChild("Head")
-								local firstPerson = camera and head and (camera.CFrame.Position - head.Position).Magnitude < 1.5
+								local firstPerson = camera ~= nil and head ~= nil
+									and (head.LocalTransparencyModifier > 0.5 or (camera.CFrame.Position - head.Position).Magnitude < 1.5)
 								local modifier = firstPerson and 1 or 0
 								for _, v in ipairs(Item:GetDescendants()) do
 									if v:IsA("BasePart") then
@@ -40760,6 +40793,10 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 											v.LocalTransparencyModifier = modifier
 										end
 									end
+								end
+								if firstPerson ~= akLastFirstPerson or Item ~= akLastItem then
+									setItemEffects(Item, firstPerson)
+									akLastFirstPerson, akLastItem = firstPerson, Item
 								end
 							end
 						end
@@ -40971,15 +41008,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		}):AddKeyPicker("AntiLagK", { Text = "Anti Lag", Default = nil, Mode = "Toggle", NoUI = false, SyncToggleState = true })
 
-		Antis:AddToggle("AutoAntiLag", {
-			Text = "Auto Anti Lag",
-			Default = true,
-			Tooltip = "Enables anti-lag for you if too low fps",
-			Callback = function(autoAntiLag)
-				tbl8.AutoAntiLag = autoAntiLag
-			end,
-		})
-
 		Antis:AddToggle("AntiInvis", {
 			Text = "Anti Invis",
 			Default = false,
@@ -41188,7 +41216,15 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 
 		v20:AddDropdown("CADropdown", {
 			Values = { "Grab", "Kill", "Void", "Delete Limbs", "Fling", "Teleport to Spawn", "Anchor" },
-			Default = "Kill",
+			ValueImages = {
+				Grab = "hand-grab",
+				Kill = "skull",
+				Void = "circle-dashed",
+				["Delete Limbs"] = "trash-2",
+				Fling = "wind",
+				["Teleport to Spawn"] = "locate-fixed",
+				Anchor = "anchor",
+			},			Default = "Kill",
 			Multi = false,
 			Text = "Consequences",
 			Tooltip = "What will you do when someone touches you and you have Counter-attack on",
@@ -41226,14 +41262,13 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 	do
 		local Config = tbl15.Invincibility:AddRightGroupbox("Config", "settings")
 
-		-- One category at a time, like the Anti-Kick tabs below.
 		Config:AddDropdown("InvConfigCategory", {
-			Values = { "Anti-Grab", "Anti Net-Owner", "Anti-Lag", "Auto Reset" },
+			Values = { "Anti-Grab", "Anti-Lag", "Anti Net-Owner", "Auto Reset" },
 			ValueImages = {
 				["Anti-Grab"] = "hand",
-				["Anti Net-Owner"] = "wifi-off",
-				["Anti-Lag"] = "gauge",
-				["Auto Reset"] = "rotate-cw",
+				["Anti-Lag"] = "shield",
+				["Anti Net-Owner"] = "network",
+				["Auto Reset"] = "rotate-ccw",
 			},
 			Default = 1,
 			Multi = false,
@@ -41244,12 +41279,27 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 		antiGrabBox:SetupDependencies({ { options.InvConfigCategory, "Anti-Grab" } })
 		antiGrabBox:AddDropdown("AGTDropdown", {
 			Values = { "Normal", "No Ragdoll", "Anti-Kill", "Escapes Anything, but buggy" },
+			ValueImages = {
+				["Normal"] = "circle-check",
+				["No Ragdoll"] = "person-standing",
+				["Anti-Kill"] = "heart-pulse",
+				["Escapes Anything, but buggy"] = "zap",
+			},
 			Default = 1,
 			Multi = false,
 			Text = "Anti-Grab Type",
 			Tooltip = "Type of default Anti-Grab",
 			Callback = function(agType)
 				tbl9.AGType = agType
+			end,
+		})
+
+		antiGrabBox:AddToggle("AllowWhitelistedGrabs", {
+			Text = "Allow Whitelisted Grabs",
+			Default = false,
+			Tooltip = "Lets whitelisted players hold you. Only affects normal Anti-Grab",
+			Callback = function(allow)
+				tbl8.AllowWhitelistedGrabs = allow
 			end,
 		})
 
@@ -41280,96 +41330,100 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
+		local antiLagBox = Config:AddDependencyBox()
+		antiLagBox:SetupDependencies({ { options.InvConfigCategory, "Anti-Lag" } })
+		antiLagBox:AddToggle("AutoAntiLag", {
+			Text = "Auto Anti Lag",
+			Default = true,
+			Tooltip = "Enables anti-lag for you if your FPS drops below the threshold",
+			Callback = function(autoAntiLag)
+				tbl8.AutoAntiLag = autoAntiLag
+			end,
+		})
+		antiLagBox:AddSlider("AntiLagSens", {
+			Text = "FPS Threshold",
+			Compact = true,
+			Default = 3,
+			Min = 1,
+			Max = 10,
+			Suffix = " FPS",
+			Rounding = 0,
+			Tooltip = "Auto Anti Lag turns on when your FPS drops below this",
+			Callback = function(antiLagSens)
+				tbl9.AntiLagSens = antiLagSens
+			end,
+		})
+
+		local netOwnerToys = {
+			{ "FoodHamburger", "Hamburger", "rbxassetid://107005089698340" },
+			{ "InstrumentDrumBongos", "Bongos", "rbxassetid://121844247397293" },
+			{ "InstrumentBrassTrumpet", "Trumpet", "rbxassetid://96100498305663" },
+			{ "InstrumentBrassBugle", "Bugle", "rbxassetid://87157563194460" },
+			{ "InstrumentVoiceMicrophone", "Microphone", "rbxassetid://122274381498776" },
+			{ "InstrumentWoodwindOcarina", "Ocarina", "rbxassetid://111465927393012" },
+			{ "InstrumentGuitarUkulele", "Ukulele", "rbxassetid://95555859846275" },
+			{ "InstrumentGuitarLyre", "Lyre", "rbxassetid://95132812667755" },
+			{ "InstrumentGuitarBanjo", "Banjo", "rbxassetid://116000546776316" },
+			{ "InstrumentGuitarAcoustic", "Acoustic Guitar", "rbxassetid://134044426735217" },
+			{ "CupMugBrown", "Mug (Brown)", "rbxassetid://74168393624840" },
+			{ "CupMugWhite", "Mug (White)", "rbxassetid://107681115846393" },
+			{ "FoodBanana", "Banana", "rbxassetid://75484207768793" },
+			{ "FoodBread", "Bread", "rbxassetid://73483588123877" },
+			{ "FoodBroccoli", "Broccoli", "rbxassetid://97340085804476" },
+			{ "FoodCakePink", "Pink Cake", "rbxassetid://135967824239828" },
+			{ "FoodCoconut", "Coconut", "rbxassetid://133875991045577" },
+			{ "FoodDippyEgg", "Dippy Egg", "rbxassetid://89197648899618" },
+			{ "FoodDonut", "Donut", "rbxassetid://121685717166327" },
+			{ "FoodFrenchFries", "French Fries", "rbxassetid://94745609579445" },
+			{ "FoodHotdog", "Hotdog", "rbxassetid://106249136532377" },
+			{ "FoodMayonnaise", "Mayo", "rbxassetid://87917161433070" },
+			{ "FoodMeatStick", "Meat Stick", "rbxassetid://119912069009462" },
+			{ "FoodMushroomPoison", "Poison Mushroom", "rbxassetid://103335679226894" },
+			{ "FoodPizzaCheese", "Cheese Pizza", "rbxassetid://106931956314027" },
+			{ "FoodPizzaPepperoni", "Pepperoni Pizza", "rbxassetid://94216796644855" },
+			{ "FoodSodaCan", "Soda Can", "rbxassetid://85081927222669" },
+			{ "PoopPile", "Poop", "rbxassetid://102977099237461" },
+			{ "PoopPileSparkle", "Sparkle Poop", "rbxassetid://121252324664942" },
+		}
+		local netOwnerNames, netOwnerImages, netOwnerKeys = {}, {}, {}
+		for _, toy in ipairs(netOwnerToys) do
+			netOwnerNames[#netOwnerNames + 1] = toy[2]
+			netOwnerImages[toy[2]] = toy[3]
+			netOwnerKeys[toy[2]] = toy[1]
+			netOwnerKeys[toy[1]] = toy[1]
+		end
+
 		local netOwnerBox = Config:AddDependencyBox()
 		netOwnerBox:SetupDependencies({ { options.InvConfigCategory, "Anti Net-Owner" } })
 		netOwnerBox:AddDropdown("AITDropdown", {
-			Values = {
-				"FoodHamburger",
-				"InstrumentDrumBongos",
-				"InstrumentBrassTrumpet",
-				"InstrumentBrassBugle",
-				"InstrumentVoiceMicrophone",
-				"InstrumentWoodwindOcarina",
-				"InstrumentGuitarUkulele",
-				"InstrumentGuitarLyre",
-				"InstrumentGuitarBanjo",
-				"InstrumentGuitarAcoustic",
-				"CupMugBrown",
-				"CupMugWhite",
-				"FoodBanana",
-				"FoodBread",
-				"FoodBroccoli",
-				"FoodCakePink",
-				"FoodCoconut",
-				"FoodDippyEgg",
-				"FoodDonut",
-				"FoodFrenchFries",
-				"FoodHotdog",
-				"FoodMayonnaise",
-				"FoodMeatStick",
-				"FoodMushroomPoison",
-				"FoodPizzaCheese",
-				"FoodPizzaPepperoni",
-				"FoodSodaCan",
-				"PoopPile",
-				"PoopPileSparkle",
-			},
-			ValueImages = {
-				InstrumentDrumBongos = "rbxassetid://121844247397293",
-				InstrumentBrassTrumpet = "rbxassetid://96100498305663",
-				InstrumentBrassBugle = "rbxassetid://87157563194460",
-				InstrumentVoiceMicrophone = "rbxassetid://122274381498776",
-				InstrumentWoodwindOcarina = "rbxassetid://111465927393012",
-				InstrumentGuitarUkulele = "rbxassetid://95555859846275",
-				InstrumentGuitarLyre = "rbxassetid://95132812667755",
-				InstrumentGuitarBanjo = "rbxassetid://116000546776316",
-				InstrumentGuitarAcoustic = "rbxassetid://134044426735217",
-				CupMugBrown = "rbxassetid://74168393624840",
-				CupMugWhite = "rbxassetid://107681115846393",
-				FoodBanana = "rbxassetid://75484207768793",
-				FoodBread = "rbxassetid://73483588123877",
-				FoodBroccoli = "rbxassetid://97340085804476",
-				FoodCakePink = "rbxassetid://135967824239828",
-				FoodCoconut = "rbxassetid://133875991045577",
-				FoodDippyEgg = "rbxassetid://89197648899618",
-				FoodDonut = "rbxassetid://121685717166327",
-				FoodFrenchFries = "rbxassetid://94745609579445",
-				FoodHotdog = "rbxassetid://106249136532377",
-				FoodMayonnaise = "rbxassetid://87917161433070",
-				FoodMeatStick = "rbxassetid://119912069009462",
-				FoodMushroomPoison = "rbxassetid://103335679226894",
-				FoodPizzaCheese = "rbxassetid://106931956314027",
-				FoodPizzaPepperoni = "rbxassetid://94216796644855",
-				FoodSodaCan = "rbxassetid://85081927222669",
-				FoodHamburger = "rbxassetid://107005089698340",
-				PoopPile = "rbxassetid://102977099237461",
-				PoopPileSparkle = "rbxassetid://121252324664942",
-			},
+			Values = netOwnerNames,
+			ValueImages = netOwnerImages,
 			Default = 1,
 			Multi = false,
-			Text = "Type",
+			Text = "Toy",
 			Tooltip = "What interactable item will you use when doing anti-Net Owner",
-			Callback = function(antiInputType)
-				tbl9.AntiInputType = antiInputType
+			Callback = function(name)
+				tbl9.AntiInputType = netOwnerKeys[name] or "FoodHamburger"
 			end,
 		})
 
 		netOwnerBox:AddSlider("AntiInpLagDel", {
 			Text = "Grab & Drop Delay",
+			Compact = true,
 			Default = 0.05,
 			Min = 0,
-			Max = 0.3,
+			Max = 0.25,
 			Suffix = " sec",
 			Rounding = 2,
+			Tooltip = "Below 0.05 can cause high ping",
 			Callback = function(inputLgDelay)
 				tbl9.InputLgDelay = inputLgDelay
 			end,
 		})
 
-		netOwnerBox:AddLabel("Below 0.05 can cause high ping")
-
 		netOwnerBox:AddSlider("ItemTransAK", {
 			Text = "Item Transparency",
+			Compact = true,
 			Default = tbl9.AILTransparency,
 			Min = 0,
 			Max = 1,
@@ -41379,27 +41433,51 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		local antiLagBox = Config:AddDependencyBox()
-		antiLagBox:SetupDependencies({ { options.InvConfigCategory, "Anti-Lag" } })
-		antiLagBox:AddSlider("AntiLagSens", {
-			Text = "Auto Anti-Lag Sensitivity",
-			Default = 3,
-			Min = 1,
-			Max = 20,
-			Suffix = " FPS",
-			Callback = function(antiLagSens)
-				tbl9.AntiLagSens = antiLagSens
-			end,
-		})
-
 		local autoResetBox = Config:AddDependencyBox()
 		autoResetBox:SetupDependencies({ { options.InvConfigCategory, "Auto Reset" } })
 		autoResetBox:AddToggle("AutoLeave", {
 			Text = "Auto Leave",
 			Default = true,
-			Tooltip = "Leaves after four detected kick flags instead of continuing to reset",
+			Tooltip = "Leaves once Flags Before Leaving is reached instead of continuing to reset",
 			Callback = function(autoLeave)
 				tbl8.AutoLeave = autoLeave
+			end,
+		})
+		autoResetBox:AddSlider("FlagsBeforeReset", {
+			Text = "Flags Before Reset",
+			Compact = true,
+			Default = 1,
+			Min = 1,
+			Max = 4,
+			Rounding = 0,
+			Tooltip = "Kick flags needed before you get reset",
+			Callback = function(value)
+				tbl9.FlagsBeforeReset = value
+			end,
+		})
+		autoResetBox:AddSlider("FlagResetTimer", {
+			Text = "Flag Reset Timer",
+			Compact = true,
+			Default = 1,
+			Min = 0.5,
+			Max = 3,
+			Rounding = 1,
+			Suffix = "s",
+			Tooltip = "Flags further apart than this start counting from 1 again",
+			Callback = function(value)
+				tbl9.FlagResetTimer = value
+			end,
+		})
+		autoResetBox:AddSlider("FlagsBeforeLeave", {
+			Text = "Flags Before Leaving",
+			Compact = true,
+			Default = 4,
+			Min = 1,
+			Max = 4,
+			Rounding = 0,
+			Tooltip = "Kick flags in a row before Auto Leave takes you out of the server",
+			Callback = function(value)
+				tbl9.FlagsBeforeLeave = value
 			end,
 		})
 	end
@@ -41409,7 +41487,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 		local AntiKickGroup = tbl15.Invincibility:AddRightGroupbox("Anti-Kick", "shield-check")
 		local antiKickTabs = AntiKickGroup:AddTabbox({ PopOut = false })
 		local akHighlight = antiKickTabs:AddTab("Highlight", "highlighter")
-		local akItems = antiKickTabs:AddTab("Items", "package")
 
 		local AntiKickHL = akHighlight:AddToggle("AntiKickHL", {
 			Text = "Highlight",
@@ -41441,6 +41518,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 
 		akHighlight:AddSlider("FillTransAK", {
 			Text = "Fill Transparency",
+			Compact = true,
 			Default = antiKickSettings.HighlightFT,
 			Min = 0,
 			Max = 1,
@@ -41452,6 +41530,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 
 		akHighlight:AddSlider("OutlTransAK", {
 			Text = "Outline Transparency",
+			Compact = true,
 			Default = antiKickSettings.HighlightOT,
 			Min = 0,
 			Max = 1,
@@ -41463,6 +41542,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 
 		akHighlight:AddSlider("ShurTransAK", {
 			Text = "Toy Transparency",
+			Compact = true,
 			Default = antiKickSettings.Transparency,
 			Min = 0,
 			Max = 1,
@@ -41472,55 +41552,90 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		akItems:AddDropdown("AKTypeDropdown", {
-			Values = { "Shuriken", "Katana On Back", "Pencil Dih" },
-			Default = tbl9.AKTypes or { Shuriken = true },
-			Multi = true,
-			Text = "Anti-Kick Items",
-			Tooltip = "Select one or more Anti-Kick items. All selected types stay active at once.",
-			Callback = function(akTypes)
-				local allowed = { Shuriken = true, ["Katana On Back"] = true, ["Pencil Dih"] = true }
-				local nextTypes = {}
-				if type(akTypes) == "table" then
-					for k, v in pairs(akTypes) do
-						if v and allowed[k] then
-							nextTypes[k] = true
-						end
-					end
+		local akPositioning = antiKickTabs:AddTab("Positioning", "move-3d")
+		local akPresets = antiKickTabs:AddTab("Presets", "bookmark")
+
+		local AK_TOYS = {
+			{ "NinjaShuriken", "Shuriken" },
+			{ "NinjaKatana", "Katana" },
+			{ "NinjaKunai", "Kunai" },
+			{ "ToolCleaver", "Cleaver" },
+			{ "ToolDiggingForkRusty", "Rusty Fork" },
+			{ "ToolPencil", "Pencil" },
+			{ "ToolPickaxe", "Pickaxe" },
+		}
+		local akToyLabels, akLabelByToy, akToyByLabel, akToyImages = {}, {}, {}, {}
+		local okToyData, menuToysData = pcall(function()
+			return require(ReplicatedStorage.MenuToys.MenuToysData)
+		end)
+		for _, toy in ipairs(AK_TOYS) do
+			table.insert(akToyLabels, toy[2])
+			akLabelByToy[toy[1]], akToyByLabel[toy[2]] = toy[2], toy[1]
+			if okToyData then
+				local ok, url, rectOffset, rectSize = pcall(menuToysData.GetLowResToyImage, toy[1])
+				if ok and url then
+					akToyImages[toy[2]] = { Url = url, ImageRectOffset = rectOffset, ImageRectSize = rectSize }
 				end
-				if not next(nextTypes) then
-					nextTypes.Shuriken = true
-				end
-				local prev = tbl9.AKTypes or {}
-				if prev.Shuriken and not nextTypes.Shuriken then
-					v18 = destroyAkItem and destroyAkItem(v18) or (function()
-						if v18 then pcall(tbl12.DestroyToy, v18) end
-						return nil
-					end)()
-				end
-				if prev["Katana On Back"] and not nextTypes["Katana On Back"] then
-					if akKatanaItem then pcall(tbl12.DestroyToy, akKatanaItem) end
-					akKatanaItem = nil
-				end
-				if prev["Pencil Dih"] and not nextTypes["Pencil Dih"] then
-					if akPencilItem then pcall(tbl12.DestroyToy, akPencilItem) end
-					akPencilItem = nil
-					if akDonut then
-						pcall(function() tbl12.DestroyToy(akDonut) end)
-						akDonut = nil
-						akDonutRoot = nil
-					end
-				end
-				tbl9.AKTypes = nextTypes
-				tbl9.AKType = (nextTypes.Shuriken and "Shuriken")
-					or (nextTypes["Katana On Back"] and "Katana On Back")
-					or (nextTypes["Pencil Dih"] and "Pencil Dih")
-					or "Shuriken"
+			end
+		end
+
+		local function akChanged()
+			tbl9.AKDirtyAt = os.clock()
+		end
+
+		akPositioning:AddDropdown("AKToy", {
+			Text = "Toy",
+			Values = akToyLabels,
+			ValueImages = akToyImages,
+			Default = akLabelByToy[tbl9.AKToy] or "Shuriken",
+			Callback = function(label)
+				tbl9.AKToy = akToyByLabel[label] or "NinjaShuriken"
+				akChanged()
 			end,
 		})
 
-		local donutBeastBox = akItems:AddDependencyBox()
-		donutBeastBox:SetupDependencies({ { options.AKTypeDropdown, "Pencil Dih" } })
+		akPositioning:AddDropdown("AKEdit", {
+			Text = "Edit",
+			Values = { "Position", "Rotation" },
+			ValueImages = { Position = "move-3d", Rotation = "rotate-3d" },
+			Default = "Position",
+		})
+
+		local akPosBox = akPositioning:AddDependencyBox()
+		akPosBox:SetupDependencies({ { options.AKEdit, "Position" } })
+		local akRotBox = akPositioning:AddDependencyBox()
+		akRotBox:SetupDependencies({ { options.AKEdit, "Rotation" } })
+		for i, axis in ipairs({ "X", "Y", "Z" }) do
+			akPosBox:AddSlider("AKPos" .. axis, {
+				Text = axis,
+				Default = tbl9.AKPos[i],
+				Min = -5,
+				Max = 5,
+				Rounding = 2,
+				Compact = true,
+				Suffix = " studs",
+				Callback = function(v)
+					tbl9.AKPos[i] = v
+					akChanged()
+				end,
+			})
+			akRotBox:AddSlider("AKRot" .. axis, {
+				Text = axis,
+				Default = tbl9.AKRot[i],
+				Min = -180,
+				Max = 180,
+				Rounding = 0,
+				Compact = true,
+				Suffix = " deg",
+				Callback = function(v)
+					tbl9.AKRot[i] = v
+					akChanged()
+				end,
+			})
+		end
+
+		local donutBeastBox = akPositioning:AddDependencyBox()
+		donutBeastBox:SetupDependencies({ { options.AKToy, "Pencil" } })
 		donutBeastBox:AddToggle("DonutBeast", {
 			Text = "Donut Beast",
 			Default = tbl8.DonutBeast == true,
@@ -41532,6 +41647,242 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					akDonut = nil
 					akDonutRoot = nil
 				end
+			end,
+		})
+
+		local AK_BUILTIN = {
+			{ Name = "Default", Toy = "NinjaShuriken", Pos = { 0, -0.3, 0 }, Rot = { 90, 0, 0 } },
+			{ Name = "Katana on Back", Toy = "NinjaKatana", Pos = { -0.45, -0.77, 0.5 }, Rot = { 93, 42, 0 } },
+			{ Name = "Pencil Dih", Toy = "ToolPencil", Pos = { 0.07, -1.46, -0.06 }, Rot = { -1, 180, 0 } },
+			{ Name = "Pickaxe on Back", Toy = "ToolPickaxe", Pos = { 0.55, 0, 0.65 }, Rot = { -90, 45, 0 } },
+			{ Name = "Belt Kunai", Toy = "NinjaKunai", Pos = { -0.9, -0.8, 0 }, Rot = { 0, 0, -90 } },
+		}
+		local AK_PRESET_FOLDER = "Resonance/FTAP/AntiKick"
+
+		local function akValidPreset(preset)
+			if type(preset) ~= "table" or not akLabelByToy[preset.Toy] or type(preset.Pos) ~= "table" or type(preset.Rot) ~= "table" then
+				return false
+			end
+			for i = 1, 3 do
+				if type(preset.Pos[i]) ~= "number" or type(preset.Rot[i]) ~= "number" then
+					return false
+				end
+			end
+			return true
+		end
+
+		local function akApplyPreset(preset)
+			if not akValidPreset(preset) then
+				return false
+			end
+			options.AKToy:SetValue(akLabelByToy[preset.Toy])
+			for i, axis in ipairs({ "X", "Y", "Z" }) do
+				options["AKPos" .. axis]:SetValue(math.clamp(preset.Pos[i], -5, 5))
+				options["AKRot" .. axis]:SetValue(math.clamp(preset.Rot[i], -180, 180))
+			end
+			return true
+		end
+
+		local function akCurrentJSON()
+			return HttpService:JSONEncode({ Toy = tbl9.AKToy, Pos = tbl9.AKPos, Rot = tbl9.AKRot })
+		end
+
+		local function akApplyJSON(json)
+			local ok, preset = pcall(HttpService.JSONDecode, HttpService, json)
+			return ok and akApplyPreset(preset)
+		end
+
+		local function akEnsureFolder()
+			if not (isfolder and makefolder) then
+				return false
+			end
+			pcall(function()
+				for _, folder in ipairs({ "Resonance", "Resonance/FTAP", AK_PRESET_FOLDER }) do
+					if not isfolder(folder) then
+						makefolder(folder)
+					end
+				end
+			end)
+			return isfolder(AK_PRESET_FOLDER)
+		end
+
+		local function akPresetPath(name)
+			return AK_PRESET_FOLDER .. "/" .. name .. ".json"
+		end
+
+		local function akListPresets()
+			local out = {}
+			if not (listfiles and akEnsureFolder()) then
+				return out
+			end
+			local ok, files = pcall(listfiles, AK_PRESET_FOLDER)
+			for _, file in ipairs(ok and files or {}) do
+				local name = file:match("([^/\\]+)%.json$")
+				if name then
+					table.insert(out, name)
+				end
+			end
+			table.sort(out)
+			return out
+		end
+
+		akPresets:AddDropdown("AKPresetManage", {
+			Text = "Manage",
+			Values = { "Built-in", "Saved", "Sharing" },
+			ValueImages = { ["Built-in"] = "library", Saved = "folder-open", Sharing = "share-2" },
+			Default = "Built-in",
+		})
+
+		local akBuiltinBox = akPresets:AddDependencyBox()
+		akBuiltinBox:SetupDependencies({ { options.AKPresetManage, "Built-in" } })
+		local akBuiltinNames, akBuiltinImages = {}, { Default = "rotate-ccw" }
+		for _, preset in ipairs(AK_BUILTIN) do
+			table.insert(akBuiltinNames, preset.Name)
+			akBuiltinImages[preset.Name] = akBuiltinImages[preset.Name] or akToyImages[akLabelByToy[preset.Toy]]
+		end
+		akBuiltinBox:AddDropdown("AKBuiltinPreset", {
+			Text = "Preset",
+			Values = akBuiltinNames,
+			ValueImages = akBuiltinImages,
+			Default = "Default",
+		})
+
+		tbl12.AKBuiltinPresets = AK_BUILTIN
+		tbl12.AKBuiltinNames = akBuiltinNames
+		tbl12.AKBuiltinImages = akBuiltinImages
+		tbl12.AKListSavedPresets = akListPresets
+		tbl12.AKReadSavedPreset = function(name)
+			local ok, json = pcall(readfile, akPresetPath(name))
+			if not ok then
+				return nil
+			end
+			local decoded, preset = pcall(HttpService.JSONDecode, HttpService, json)
+			if decoded and akValidPreset(preset) then
+				return preset
+			end
+			return nil
+		end
+		tbl9.ImmuneAKPreset = tbl9.ImmuneAKPreset or AK_BUILTIN[1]
+		akBuiltinBox:AddButton({
+			Text = "Load Preset",
+			Icon = "folder-open",
+			Func = function()
+				for _, preset in ipairs(AK_BUILTIN) do
+					if preset.Name == options.AKBuiltinPreset.Value then
+						akApplyPreset(preset)
+						fn18(("Loaded %q"):format(preset.Name), "Anti-Kick")
+						return
+					end
+				end
+			end,
+		})
+
+		local akSavedBox = akPresets:AddDependencyBox()
+		akSavedBox:SetupDependencies({ { options.AKPresetManage, "Saved" } })
+		akSavedBox:AddInput("AKPresetName", {
+			Text = "Preset Name",
+			Placeholder = "Name your setup",
+			Default = "",
+		})
+		local akSavedList = akSavedBox:AddDropdown("AKSavedPreset", {
+			Text = "Saved Preset",
+			Values = akListPresets(),
+			AllowNull = true,
+			Default = nil,
+		})
+		local function akRefreshSaved()
+			akSavedList:SetValues(akListPresets())
+		end
+		akSavedBox:AddButton({
+			Text = "Save Current",
+			Icon = "save",
+			Func = function()
+				local name = tostring(options.AKPresetName.Value or "")
+					:gsub('[\\/:*?"<>|]', "")
+					:gsub("^%s+", "")
+					:gsub("%s+$", "")
+				if name == "" then
+					fn18("Enter a preset name first", "Anti-Kick")
+					return
+				end
+				if not (writefile and akEnsureFolder() and pcall(writefile, akPresetPath(name), akCurrentJSON())) then
+					fn18("Failed to save preset", "Anti-Kick")
+					return
+				end
+				akRefreshSaved()
+				akSavedList:SetValue(name)
+				fn18(("Saved %q"):format(name), "Anti-Kick")
+			end,
+		}):AddButton({
+			Text = "Load",
+			Icon = "folder-open",
+			Func = function()
+				local name = akSavedList.Value
+				if not name then
+					fn18("Select a saved preset first", "Anti-Kick")
+					return
+				end
+				local ok, json = pcall(readfile, akPresetPath(name))
+				if not (ok and akApplyJSON(json)) then
+					fn18(("Couldn't load %q"):format(name), "Anti-Kick")
+					return
+				end
+				fn18(("Loaded %q"):format(name), "Anti-Kick")
+			end,
+		})
+		akSavedBox:AddButton({
+			Text = "Delete",
+			Icon = "trash-2",
+			Risky = true,
+			DoubleClick = true,
+			Tooltip = "Double-click to delete the selected preset.",
+			Func = function()
+				local name = akSavedList.Value
+				if not name then
+					fn18("Select a saved preset first", "Anti-Kick")
+					return
+				end
+				if not (delfile and pcall(delfile, akPresetPath(name))) then
+					fn18("Failed to delete preset", "Anti-Kick")
+					return
+				end
+				akSavedList:SetValue(nil)
+				akRefreshSaved()
+				fn18(("Deleted %q"):format(name), "Anti-Kick")
+			end,
+		}):AddButton({
+			Text = "Refresh",
+			Icon = "refresh-cw",
+			Func = akRefreshSaved,
+		})
+
+		local akSharingBox = akPresets:AddDependencyBox()
+		akSharingBox:SetupDependencies({ { options.AKPresetManage, "Sharing" } })
+		akSharingBox:AddInput("AKPresetJSON", {
+			Text = "Preset JSON",
+			Placeholder = "Paste an exported Anti-Kick preset",
+			Default = "",
+		})
+		akSharingBox:AddButton({
+			Text = "Import JSON",
+			Icon = "file-input",
+			Func = function()
+				if akApplyJSON(tostring(options.AKPresetJSON.Value or "")) then
+					fn18("Imported preset", "Anti-Kick")
+				else
+					fn18("Invalid preset JSON", "Anti-Kick")
+				end
+			end,
+		}):AddButton({
+			Text = "Copy JSON",
+			Icon = "clipboard-copy",
+			Func = function()
+				if not setclipboard then
+					fn18("Clipboard not supported", "Anti-Kick")
+					return
+				end
+				setclipboard(akCurrentJSON())
+				fn18("Copied preset JSON", "Anti-Kick")
 			end,
 		})
 	end
@@ -41733,9 +42084,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 		tbl12.CreatePlayerDropdown(tbl15.Blobman:AddLeftGroupbox("Target", "circle-user-round"), "Blobman", selectedPlayersBlob)
 	end
 
-	-- ==========================================================
-	--  Target Preview (lightweight)
-	-- ==========================================================
 	do
 		local preview = {
 			Gui = nil,
@@ -41929,45 +42277,90 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			preview.Camera.FieldOfView = 50
 		end
 
+		local previewTween = game:GetService("TweenService")
+		local PREVIEW_ON = Color3.fromRGB(90, 225, 140)
+		local PREVIEW_OFF = Color3.fromRGB(150, 150, 162)
+		local PREVIEW_DEAD = Color3.fromRGB(240, 85, 85)
+		local PREVIEW_HEADER, PREVIEW_GRID, PREVIEW_PAD = 56, 118, 10
+
+		local function setStat(card, on, text)
+			local color = on and PREVIEW_ON or PREVIEW_OFF
+			card.Value.Text = text
+			card.Value.TextColor3 = on and Color3.new(1, 1, 1) or PREVIEW_OFF
+			card.Dot.BackgroundColor3 = color
+			if card.Last ~= nil and card.Last ~= text then
+				card.Stroke.Transparency = 0.15
+				card.Stroke.Color = color
+				previewTween:Create(card.Stroke, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), { Transparency = 0.86 }):Play()
+			end
+			card.Last = text
+		end
+
+		local function cachedFriends(player)
+			local cache = preview.FriendsCache
+			local now = os.clock()
+			if cache and cache.UserId == player.UserId and now - cache.Time < 10 then
+				return cache.Count
+			end
+			local count = countFriends(player)
+			preview.FriendsCache = { UserId = player.UserId, Time = now, Count = count }
+			return count
+		end
+
 		local function updateInfo(player)
 			local L = preview.Labels
 			if not L.Name then
 				return
 			end
-			L.Name.Text = string.format("%s (@%s)", player.DisplayName or player.Name, player.Name)
+			L.Name.Text = player.DisplayName or player.Name
+			L.User.Text = "@" .. player.Name
+			local thumb = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(player.UserId) .. "&w=150&h=150"
+			if L.Avatar.Image ~= thumb then
+				L.Avatar.Image = thumb
+			end
 			local char = player.Character
 			local hum = char and char:FindFirstChildOfClass("Humanoid")
-			local alive = hum and hum.Health > 0
-			if alive then
-				L.Alive.Text = "Alive"
-				L.Alive.TextColor3 = Color3.fromRGB(80, 220, 120)
-			else
-				L.Alive.Text = "Dead"
-				L.Alive.TextColor3 = Color3.fromRGB(235, 80, 80)
-			end
+			local alive = hum ~= nil and hum.Health > 0
+			local aliveColor = alive and PREVIEW_ON or PREVIEW_DEAD
+			L.Alive.Text = alive and "ALIVE" or "DEAD"
+			L.Alive.TextColor3 = aliveColor
+			L.AliveDot.BackgroundColor3 = aliveColor
+			L.AlivePill.BackgroundColor3 = aliveColor
 			local rag = isRagdolled(char)
-			L.Ragdoll.Text = "Ragdolled = " .. (rag and "True" or "False")
-			if rag then
-				L.Ragdoll.TextColor3 = Color3.fromRGB(80, 220, 120)
-			else
-				L.Ragdoll.TextColor3 = Color3.fromRGB(235, 80, 80)
-			end
-			local sit = hum and hum.Sit == true
-			L.Sitting.Text = "Sitting = " .. (sit and "True" or "False")
-			if sit then
-				L.Sitting.TextColor3 = Color3.fromRGB(80, 220, 120)
-			else
-				L.Sitting.TextColor3 = Color3.fromRGB(235, 80, 80)
-			end
-			L.Blob.Text = "Blobmans: " .. tostring(countBlobmans(player))
-			L.Friends.Text = "Friends in Server: " .. tostring(countFriends(player))
+			setStat(L.Ragdoll, rag, rag and "Yes" or "No")
+			local sit = hum ~= nil and hum.Sit == true
+			setStat(L.Sitting, sit, sit and "Yes" or "No")
+			local blobs = countBlobmans(player)
+			setStat(L.Blob, blobs > 0, tostring(blobs))
+			local friends = cachedFriends(player)
+			setStat(L.Friends, friends > 0, tostring(friends))
 			local my = localPlayer.Character
 			local myH = my and (my:FindFirstChild("HumanoidRootPart") or my:FindFirstChild("Torso"))
 			local th = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
+			local owned = false
+			if th then
+				local ok, result = pcall(function()
+					return tbl12.IsNetworkOwner(th) or tbl12.IsPartOwner(th)
+				end)
+				owned = ok and result == true
+			end
+			local sno = L.Sno
+			if sno.Last ~= owned then
+				local color = owned and PREVIEW_ON or PREVIEW_OFF
+				sno.Dot.BackgroundColor3 = color
+				sno.Label.TextColor3 = owned and Color3.new(1, 1, 1) or PREVIEW_OFF
+				sno.Stroke.Color = color
+				sno.Stroke.Transparency = owned and 0.3 or 0.85
+				if sno.Last ~= nil then
+					sno.Scale.Scale = 1.15
+					previewTween:Create(sno.Scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+				end
+				sno.Last = owned
+			end
 			if myH and th then
-				L.Studs.Text = string.format("Studs away: %.1f", (myH.Position - th.Position).Magnitude)
+				L.Studs.Text = string.format("%.1f studs", (myH.Position - th.Position).Magnitude)
 			else
-				L.Studs.Text = "Studs away: --"
+				L.Studs.Text = "-- studs"
 			end
 		end
 
@@ -41979,6 +42372,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			gui.Name = "RSC_TargetPreview"
 			gui.ResetOnSpawn = false
 			gui.DisplayOrder = 100
+			gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 			pcall(function()
 				if gethui then
 					gui.Parent = gethui()
@@ -41990,127 +42384,294 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				gui.Parent = localPlayer:WaitForChild("PlayerGui")
 			end
 			preview.Gui = gui
+			preview.MinSize = Vector2.new(260, 380)
+
+			local function round(parent, radius)
+				local c = Instance.new("UICorner")
+				c.CornerRadius = radius or UDim.new(1, 0)
+				c.Parent = parent
+				return c
+			end
+			local function outline(parent, transparency, thickness)
+				local s = Instance.new("UIStroke")
+				s.Color = Color3.new(1, 1, 1)
+				s.Transparency = transparency
+				s.Thickness = thickness or 1
+				s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+				s.Parent = parent
+				return s
+			end
+			local function text(parent, props)
+				local l = Instance.new("TextLabel")
+				l.BackgroundTransparency = 1
+				l.TextXAlignment = Enum.TextXAlignment.Left
+				l.TextTruncate = Enum.TextTruncate.AtEnd
+				l.TextColor3 = Color3.new(1, 1, 1)
+				for k, v in pairs(props) do
+					l[k] = v
+				end
+				l.Parent = parent
+				return l
+			end
 
 			local frame = Instance.new("Frame")
 			frame.Name = "Window"
 			frame.AnchorPoint = Vector2.new(1, 0)
-			frame.Position = UDim2.new(1, -12, 0, 12)
-			frame.Size = UDim2.fromOffset(280, 360)
-			frame.BackgroundColor3 = Color3.fromRGB(18, 18, 20)
+			frame.Position = UDim2.new(1, -16, 0, 16)
+			frame.Size = UDim2.fromOffset(300, 400)
+			frame.BackgroundColor3 = Color3.fromRGB(17, 17, 21)
+			frame.BackgroundTransparency = 0.05
 			frame.BorderSizePixel = 0
 			frame.ClipsDescendants = true
 			frame.Parent = gui
 			preview.Frame = frame
-
-			local corner = Instance.new("UICorner")
-			corner.CornerRadius = UDim.new(0, 10)
-			corner.Parent = frame
-
-			local stroke = Instance.new("UIStroke")
-			stroke.Color = Color3.fromRGB(55, 55, 60)
-			stroke.Thickness = 1.5
-			stroke.Parent = frame
+			round(frame, UDim.new(0, 14))
+			outline(frame, 0.8, 1.5)
+			local frameGradient = Instance.new("UIGradient")
+			frameGradient.Rotation = 90
+			frameGradient.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(170, 170, 180))
+			frameGradient.Parent = frame
+			local scale = Instance.new("UIScale")
+			scale.Parent = frame
+			preview.Scale = scale
 
 			local title = Instance.new("TextButton")
-			title.Size = UDim2.new(1, 0, 0, 28)
-			title.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
-			title.BorderSizePixel = 0
-			title.Text = "  Target Preview"
-			title.TextXAlignment = Enum.TextXAlignment.Left
-			title.TextColor3 = Color3.fromRGB(230, 230, 235)
-			title.Font = Enum.Font.GothamMedium
-			title.TextSize = 13
+			title.Size = UDim2.new(1, 0, 0, PREVIEW_HEADER)
+			title.BackgroundTransparency = 1
+			title.Text = ""
 			title.AutoButtonColor = false
 			title.Parent = frame
 
-			local titleCorner = Instance.new("UICorner")
-			titleCorner.CornerRadius = UDim.new(0, 10)
-			titleCorner.Parent = title
+			local avatar = Instance.new("ImageLabel")
+			avatar.AnchorPoint = Vector2.new(0, 0.5)
+			avatar.Position = UDim2.new(0, 12, 0.5, 0)
+			avatar.Size = UDim2.fromOffset(36, 36)
+			avatar.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+			avatar.Parent = title
+			round(avatar)
+			outline(avatar, 0.65, 1.5)
+			preview.Labels.Avatar = avatar
+
+			preview.Labels.Name = text(title, {
+				Position = UDim2.new(0, 58, 0, 10),
+				Size = UDim2.new(1, -150, 0, 18),
+				Font = Enum.Font.GothamBold,
+				TextSize = 15,
+			})
+			preview.Labels.User = text(title, {
+				Position = UDim2.new(0, 58, 0, 29),
+				Size = UDim2.new(1, -150, 0, 15),
+				Font = Enum.Font.Gotham,
+				TextSize = 12,
+				TextColor3 = Color3.fromRGB(150, 150, 162),
+			})
+
+			local pill = Instance.new("Frame")
+			pill.AnchorPoint = Vector2.new(1, 0.5)
+			pill.Position = UDim2.new(1, -44, 0.5, 0)
+			pill.Size = UDim2.fromOffset(62, 22)
+			pill.BackgroundColor3 = PREVIEW_ON
+			pill.BackgroundTransparency = 0.85
+			pill.Parent = title
+			round(pill)
+			preview.Labels.AlivePill = pill
+			local pillDot = Instance.new("Frame")
+			pillDot.AnchorPoint = Vector2.new(0, 0.5)
+			pillDot.Position = UDim2.new(0, 9, 0.5, 0)
+			pillDot.Size = UDim2.fromOffset(6, 6)
+			pillDot.BackgroundColor3 = PREVIEW_ON
+			pillDot.Parent = pill
+			round(pillDot)
+			preview.Labels.AliveDot = pillDot
+			preview.Labels.Alive = text(pill, {
+				Position = UDim2.new(0, 20, 0, 0),
+				Size = UDim2.new(1, -24, 1, 0),
+				Font = Enum.Font.GothamBold,
+				TextSize = 11,
+				TextColor3 = PREVIEW_ON,
+			})
 
 			local close = Instance.new("TextButton")
 			close.AnchorPoint = Vector2.new(1, 0.5)
-			close.Position = UDim2.new(1, -6, 0.5, 0)
-			close.Size = UDim2.fromOffset(22, 22)
-			close.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
-			close.Text = "x"
-			close.TextColor3 = Color3.fromRGB(220, 220, 220)
+			close.Position = UDim2.new(1, -10, 0.5, 0)
+			close.Size = UDim2.fromOffset(26, 26)
+			close.BackgroundColor3 = Color3.new(1, 1, 1)
+			close.BackgroundTransparency = 1
+			close.Text = "×"
+			close.TextColor3 = Color3.fromRGB(200, 200, 210)
 			close.Font = Enum.Font.GothamBold
-			close.TextSize = 16
+			close.TextSize = 20
+			close.AutoButtonColor = false
 			close.Parent = title
-
-			local closeCorner = Instance.new("UICorner")
-			closeCorner.CornerRadius = UDim.new(0, 6)
-			closeCorner.Parent = close
+			round(close)
+			close.MouseEnter:Connect(function()
+				previewTween:Create(close, TweenInfo.new(0.15), { BackgroundTransparency = 0.88, TextColor3 = Color3.new(1, 1, 1) }):Play()
+			end)
+			close.MouseLeave:Connect(function()
+				previewTween:Create(close, TweenInfo.new(0.15), { BackgroundTransparency = 1, TextColor3 = Color3.fromRGB(200, 200, 210) }):Play()
+			end)
 			close.MouseButton1Click:Connect(hideWindow)
 
+			local divider = Instance.new("Frame")
+			divider.Position = UDim2.new(0, 12, 0, PREVIEW_HEADER)
+			divider.Size = UDim2.new(1, -24, 0, 1)
+			divider.BackgroundColor3 = Color3.new(1, 1, 1)
+			divider.BackgroundTransparency = 0.9
+			divider.BorderSizePixel = 0
+			divider.Parent = frame
+
 			local vp = Instance.new("ViewportFrame")
-			vp.Position = UDim2.new(0, 8, 0, 34)
-			vp.Size = UDim2.new(1, -16, 0, 170)
-			vp.BackgroundColor3 = Color3.fromRGB(12, 14, 18)
+			vp.Position = UDim2.new(0, PREVIEW_PAD, 0, PREVIEW_HEADER + PREVIEW_PAD)
+			vp.Size = UDim2.new(1, -PREVIEW_PAD * 2, 0, 196)
+			vp.BackgroundColor3 = Color3.fromRGB(26, 28, 34)
 			vp.BorderSizePixel = 0
-			vp.Ambient = Color3.fromRGB(140, 140, 150)
+			vp.Ambient = Color3.fromRGB(150, 150, 160)
 			vp.LightColor = Color3.fromRGB(255, 255, 255)
 			vp.LightDirection = Vector3.new(-0.4, -1, -0.3)
 			vp.Parent = frame
 			preview.Viewport = vp
-
-			local vpCorner = Instance.new("UICorner")
-			vpCorner.CornerRadius = UDim.new(0, 8)
-			vpCorner.Parent = vp
+			round(vp, UDim.new(0, 10))
+			outline(vp, 0.9)
 
 			local world = Instance.new("WorldModel")
 			world.Parent = vp
 			preview.World = world
-
 			local cam = Instance.new("Camera")
 			cam.Parent = vp
 			vp.CurrentCamera = cam
 			preview.Camera = cam
 
-			local info = Instance.new("Frame")
-			info.Position = UDim2.new(0, 10, 0, 212)
-			info.Size = UDim2.new(1, -20, 1, -220)
-			info.BackgroundTransparency = 1
-			info.Parent = frame
+			local badge = Instance.new("Frame")
+			badge.AnchorPoint = Vector2.new(0, 1)
+			badge.Position = UDim2.new(0, 8, 1, -8)
+			badge.Size = UDim2.fromOffset(0, 22)
+			badge.AutomaticSize = Enum.AutomaticSize.X
+			badge.BackgroundColor3 = Color3.new(0, 0, 0)
+			badge.BackgroundTransparency = 0.4
+			badge.ZIndex = 3
+			badge.Parent = vp
+			round(badge)
+			outline(badge, 0.85)
+			local badgePad = Instance.new("UIPadding")
+			badgePad.PaddingLeft = UDim.new(0, 10)
+			badgePad.PaddingRight = UDim.new(0, 10)
+			badgePad.Parent = badge
+			preview.Labels.Studs = text(badge, {
+				Size = UDim2.fromScale(0, 1),
+				AutomaticSize = Enum.AutomaticSize.X,
+				Font = Enum.Font.GothamBold,
+				TextSize = 12,
+				TextTruncate = Enum.TextTruncate.None,
+				ZIndex = 3,
+			})
 
-			local layout = Instance.new("UIListLayout")
-			layout.Padding = UDim.new(0, 4)
-			layout.Parent = info
+			local snoBadge = Instance.new("Frame")
+			snoBadge.Position = UDim2.new(0, 8, 0, 8)
+			snoBadge.Size = UDim2.fromOffset(62, 22)
+			snoBadge.BackgroundColor3 = Color3.new(0, 0, 0)
+			snoBadge.BackgroundTransparency = 0.4
+			snoBadge.ZIndex = 3
+			snoBadge.Parent = vp
+			round(snoBadge)
+			local snoStroke = outline(snoBadge, 0.85, 1.5)
+			snoStroke.Color = PREVIEW_OFF
+			local snoScale = Instance.new("UIScale")
+			snoScale.Parent = snoBadge
+			local snoDot = Instance.new("Frame")
+			snoDot.AnchorPoint = Vector2.new(0, 0.5)
+			snoDot.Position = UDim2.new(0, 10, 0.5, 0)
+			snoDot.Size = UDim2.fromOffset(7, 7)
+			snoDot.BackgroundColor3 = PREVIEW_OFF
+			snoDot.ZIndex = 3
+			snoDot.Parent = snoBadge
+			round(snoDot)
+			local snoLabel = text(snoBadge, {
+				Position = UDim2.new(0, 23, 0, 0),
+				Size = UDim2.new(1, -27, 1, 0),
+				Font = Enum.Font.GothamBold,
+				TextSize = 12,
+				Text = "SNO",
+				TextColor3 = PREVIEW_OFF,
+				ZIndex = 3,
+			})
+			preview.Labels.Sno = { Dot = snoDot, Label = snoLabel, Stroke = snoStroke, Scale = snoScale }
 
-			local function lab(o)
-				local l = Instance.new("TextLabel")
-				l.BackgroundTransparency = 1
-				l.Size = UDim2.new(1, 0, 0, 17)
-				l.Font = Enum.Font.Gotham
-				l.TextSize = 13
-				l.TextXAlignment = Enum.TextXAlignment.Left
-				l.TextColor3 = Color3.fromRGB(210, 210, 215)
-				l.LayoutOrder = o
-				l.Parent = info
-				return l
+			local logo = Instance.new("ImageLabel")
+			logo.AnchorPoint = Vector2.new(1, 1)
+			logo.Position = UDim2.new(1, -6, 1, -4)
+			logo.Size = UDim2.fromOffset(46, 46)
+			logo.BackgroundTransparency = 1
+			logo.Image = huiGLogoAsset or ""
+			logo.ImageTransparency = 0.55
+			logo.ScaleType = Enum.ScaleType.Fit
+			logo.ZIndex = 3
+			logo.Parent = vp
+
+			local grid = Instance.new("Frame")
+			grid.AnchorPoint = Vector2.new(0, 1)
+			grid.Position = UDim2.new(0, PREVIEW_PAD, 1, -PREVIEW_PAD)
+			grid.Size = UDim2.new(1, -PREVIEW_PAD * 2, 0, PREVIEW_GRID)
+			grid.BackgroundTransparency = 1
+			grid.Parent = frame
+			local gridLayout = Instance.new("UIGridLayout")
+			gridLayout.CellSize = UDim2.new(0.5, -4, 0.5, -4)
+			gridLayout.CellPadding = UDim2.fromOffset(8, 8)
+			gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			gridLayout.Parent = grid
+
+			local function card(caption, order)
+				local c = Instance.new("Frame")
+				c.BackgroundColor3 = Color3.new(1, 1, 1)
+				c.BackgroundTransparency = 0.955
+				c.LayoutOrder = order
+				c.Parent = grid
+				round(c, UDim.new(0, 10))
+				local stroke = outline(c, 0.86)
+				text(c, {
+					Position = UDim2.new(0, 12, 0, 9),
+					Size = UDim2.new(1, -24, 0, 12),
+					Font = Enum.Font.GothamMedium,
+					TextSize = 10,
+					Text = caption,
+					TextColor3 = Color3.fromRGB(140, 140, 152),
+				})
+				local dot = Instance.new("Frame")
+				dot.AnchorPoint = Vector2.new(0, 0.5)
+				dot.Position = UDim2.new(0, 12, 1, -18)
+				dot.Size = UDim2.fromOffset(8, 8)
+				dot.BackgroundColor3 = PREVIEW_OFF
+				dot.Parent = c
+				round(dot)
+				local value = text(c, {
+					AnchorPoint = Vector2.new(0, 0.5),
+					Position = UDim2.new(0, 27, 1, -18),
+					Size = UDim2.new(1, -35, 0, 20),
+					Font = Enum.Font.GothamBold,
+					TextSize = 16,
+				})
+				return { Value = value, Dot = dot, Stroke = stroke }
 			end
-
-			preview.Labels.Name = lab(1)
-			preview.Labels.Ragdoll = lab(2)
-			preview.Labels.Sitting = lab(3)
-			preview.Labels.Alive = lab(4)
-			preview.Labels.Blob = lab(5)
-			preview.Labels.Friends = lab(6)
-			preview.Labels.Studs = lab(7)
+			preview.Labels.Ragdoll = card("RAGDOLLED", 1)
+			preview.Labels.Sitting = card("SITTING", 2)
+			preview.Labels.Blob = card("BLOBMANS", 3)
+			preview.Labels.Friends = card("FRIENDS HERE", 4)
 
 			local hBR = Instance.new("TextButton")
 			hBR.AnchorPoint = Vector2.new(1, 1)
-			hBR.Position = UDim2.new(1, -2, 1, -2)
-			hBR.Size = UDim2.fromOffset(14, 14)
-			hBR.BackgroundColor3 = Color3.fromRGB(130, 130, 140)
-			hBR.BackgroundTransparency = 0.3
+			hBR.Position = UDim2.new(1, -3, 1, -3)
+			hBR.Size = UDim2.fromOffset(12, 12)
+			hBR.BackgroundColor3 = Color3.new(1, 1, 1)
+			hBR.BackgroundTransparency = 0.8
 			hBR.Text = ""
+			hBR.AutoButtonColor = false
 			hBR.ZIndex = 5
 			hBR.Parent = frame
+			round(hBR)
 
-			local hCorner = Instance.new("UICorner")
-			hCorner.CornerRadius = UDim.new(1, 0)
-			hCorner.Parent = hBR
+			local function relayout(h)
+				local vpH = math.max(h - PREVIEW_HEADER - PREVIEW_PAD * 3 - PREVIEW_GRID, 100)
+				vp.Size = UDim2.new(1, -PREVIEW_PAD * 2, 0, vpH)
+			end
 
 			title.InputBegan:Connect(function(input)
 				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -42149,10 +42710,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					local w = math.clamp(preview.SizeStart.X + d.X, preview.MinSize.X, preview.MaxSize.X)
 					local h = math.clamp(preview.SizeStart.Y + d.Y, preview.MinSize.Y, preview.MaxSize.Y)
 					frame.Size = UDim2.fromOffset(w, h)
-					local vpH = math.clamp(h * 0.47, 120, 280)
-					vp.Size = UDim2.new(1, -16, 0, vpH)
-					info.Position = UDim2.new(0, 10, 0, 34 + vpH + 8)
-					info.Size = UDim2.new(1, -20, 1, -(34 + vpH + 16))
+					relayout(h)
 				end
 			end)
 
@@ -42170,8 +42728,13 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				return
 			end
 			ensureGui()
+			local wasHidden = not preview.Frame.Visible
 			preview.Target = player
 			preview.Frame.Visible = true
+			if wasHidden and preview.Scale then
+				preview.Scale.Scale = 0.92
+				previewTween:Create(preview.Scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+			end
 			rebuildClone(player)
 			updateCamera(player)
 			updateInfo(player)
@@ -42279,7 +42842,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				tbl8.AutoSeatBlobman = autoSeatBlobman
 
 				if not autoSeatBlobman and toggles.AutoRemoveBlobman and toggles.AutoRemoveBlobman.Value then
-					-- Short delay so a Sit() that is still running can't respawn it right after.
 					task.delay(0.2, function()
 						if tbl8.AutoSeatBlobman or flag11 then return end
 						for _, child in ipairs(v17:GetChildren()) do
@@ -42340,7 +42902,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					local hasTarget = hasBlobTarget()
 					if follow.Value then
 						if not wasFollowing then
-							-- Just switched on: match the current target right away.
 							if autoSit.Value ~= hasTarget then
 								autoSit:SetValue(hasTarget)
 							end
@@ -42672,7 +43233,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 		local toysAuraMain = toysAuraTabs:AddTab("Main", "hand-grab")
 		local toysAuraShape = toysAuraTabs:AddTab("Shape", "shapes")
 		local toysAuraPosition = toysAuraTabs:AddTab("Position", "move-3d")
-		-- fn21 / fn22 add to whatever v20 is at call time, so v20 is switched per tab below.
 		local v20 = toysAuraMain
 		local toysAuraSettings = tbl7.ToysAuraSettings
 
@@ -42994,7 +43554,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 		local anchorMain = anchorTabs:AddTab("Main", "anchor")
 		local anchorBuilds = anchorTabs:AddTab("Builds", "save")
 		local anchorShare = anchorTabs:AddTab("Share", "share-2")
-		-- v20 is switched to each tab where its controls start.
 		local v20 = anchorMain
 
 		v20:AddLabel("Fill Color"):AddColorPicker("AnchorFill", {
@@ -43029,7 +43588,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			Callback = function(v)
 				tbl8.AnchorGrabNotify = v
 				if not v then
-					-- dismiss active grab alerts
 					for _, state in pairs(tbl7.AnchorGrabAlerts or {}) do
 						if state.Note then
 							pcall(function() state.Note:Destroy() end)
@@ -43040,19 +43598,14 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-            -- ==========================================================
-    --  Anchor Builds — Save / Load / Delete
-    -- ==========================================================
     do
         local ANCHOR_FOLDER = "Resonance/FTAP/anchor-builds"
         local anchorState = { Selected = nil, Name = "" }
 
         local function getSpawnFolders()
             local out = {}
-            -- primary spawn folder (always exists)
             local primary = workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
             if primary then table.insert(out, primary) end
-            -- owned plot folder (when you're in your own plot)
             for _, child in ipairs(workspace.Plots:GetChildren()) do
                 local sign = child:FindFirstChild("PlotSign")
                 local owners = sign and sign:FindFirstChild("ThisPlotsOwners")
@@ -43120,7 +43673,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
             return ok and cf or nil
         end
 
-        -- Collect anchored toys from Resonance's anchor registry + folders (nested OK)
         local function collectAnchored()
             local entries = {}
             local seen = {}
@@ -43142,7 +43694,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                 })
             end
 
-            -- 1) Source of truth: Resonance anchor system
             if tbl7.Anchored then
                 for target, state in pairs(tbl7.Anchored) do
                     if state and state.Anchored then
@@ -43163,7 +43714,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                 end
             end
 
-            -- 2) Also scan folders recursively for AnchorHighlight (nested folders)
             local function scan(container, depth)
                 if not container or depth > 6 then return end
                 for _, child in ipairs(container:GetChildren()) do
@@ -43184,7 +43734,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                 scan(folder, 0)
             end
 
-            -- 3) All players' SpawnedInToys + full PlotItems (toys often live here)
             for _, plr in pairs(Players:GetPlayers()) do
                 local f = workspace:FindFirstChild(plr.Name .. "SpawnedInToys")
                 if f then scan(f, 0) end
@@ -43223,7 +43772,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
         end
 
         local SPAWNABLE_TOYS = {
-			-- from MenuGui ToyShop Contents (game spawnable list)
 			Airhorn=true, AnvilGray=true, ArmChairBlue=true, ArmChairDarkGray=true, ArmChairPink=true, ArmChairWhite=true,
 			BallBasketball=true, BallMagicLight=true, BallSnowball=true,
 			BathroomShower=true, BathroomSink=true, BedBlanketBlue=true, BedFramedOrange=true, BedFuton=true,
@@ -43280,7 +43828,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				if not model or not model:IsA("Model") then return end
 				if model.Name ~= name then return end
 				if skipNames[model.Name] then return end
-				-- skip player characters
 				if Players:GetPlayerFromCharacter(model) then return end
 				local root = model.PrimaryPart
 					or model:FindFirstChild("Main")
@@ -43294,13 +43841,11 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				end
 			end
 
-			-- deep recursive search (map toys are nested in Map / folders)
 			local function walk(parent, depth)
 				if not parent or depth > 12 then return end
 				for _, ch in ipairs(parent:GetChildren()) do
 					if ch:IsA("Model") then
 						consider(ch)
-						-- still walk into models that are containers (map groups)
 						if depth < 8 then
 							walk(ch, depth + 1)
 						end
@@ -43310,7 +43855,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				end
 			end
 
-			-- prioritized roots first
 			for _, plr in pairs(Players:GetPlayers()) do
 				local folder = workspace:FindFirstChild(plr.Name .. "SpawnedInToys")
 				if folder then walk(folder, 0) end
@@ -43319,13 +43863,11 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			if plotItems then walk(plotItems, 0) end
 			local map = workspace:FindFirstChild("Map")
 			if map then walk(map, 0) end
-			-- full workspace fallback (catches anything else)
 			walk(workspace, 0)
 
 			return best, bestDist
 		end
 
-		-- TP under world toy, grab/own, move to build CF, TP back
 		local function stealUnspawnableToBuild(name, cf)
 			local _, myRoot, myHum = tbl12.Char()
 			if not myRoot or not myHum or myHum.Health <= 0 then
@@ -43344,11 +43886,9 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end
 
 			local returnCf = myRoot.CFrame
-			-- TP under the toy
 			tbl12.Teleport(myRoot, CFrame.new(nice.Position + Vector3.new(0, -4, 0)))
 			task.wait(0.1)
 
-			-- unanchor map props if needed so we can move them
 			pcall(function()
 				for _, p in ipairs(target:GetDescendants()) do
 					if p:IsA("BasePart") and p.Anchored then
@@ -43357,7 +43897,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				end
 			end)
 
-			-- grab + SNO (map toys often need grab)
 			pcall(function()
 				if tbl12.Grab then
 					tbl12.Grab(nice)
@@ -43427,7 +43966,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			local st = tbl7.Anchored and tbl7.Anchored[target]
 			if st then st.CFrame = cf end
 
-			-- release grab if any
 			pcall(function()
 				if tbl12.RNO then tbl12.RNO(nice) end
 			end)
@@ -43456,7 +43994,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                 local loaded, failed = 0, 0
                 local total = #data.entries
 
-                -- Live notification so you can watch progress
                 local note
                 pcall(function()
                     note = lib:Notify({
@@ -43477,7 +44014,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                     end
                 end
 
-                -- Move like Ragdoll(): SNO SoundPart, stream Position/CFrame so OTHER clients see it
                 local function moveLikeRagdollPallet(toy, cf)
                     if not toy or not toy.Parent then return false end
 
@@ -43490,10 +44026,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                         return false
                     end
 
-                    -- don't force CanCollide false permanently (that caused noclip after load)
-                    -- only disable briefly during the move stream if needed
 
-                    -- Ragdoll puts a BodyPosition on Main to drive physics replication
                     local bp = nil
                     local drive = main or ownPart
                     if drive and drive.Parent then
@@ -43507,13 +44040,11 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                         bp.Parent = drive
                     end
 
-                    -- Continuous write under ownership (this is what other clients actually see)
                     local now3 = tick()
                     while toy.Parent and tick() - now3 < 0.25 do
                         if not tbl12.IsPartOwner(ownPart) then
                             tbl12.SNO(ownPart)
                         end
-                        -- Ragdoll style: set the network-owned part every frame
                         if soundPart and soundPart.Parent then
                             soundPart.CFrame = cf
                             soundPart.AssemblyLinearVelocity = Vector3.new(0, -10, 0)
@@ -43524,7 +44055,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                         if bp and bp.Parent then
                             bp.Position = cf.Position
                         end
-                        -- multi-part toys: also PivotTo so assemblies stay together
                         if toy:IsA("Model") then
                             pcall(tbl12.PivotTo, toy, cf)
                         end
@@ -43541,11 +44071,9 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                             ownPart.CFrame = cf
                         end
                     end)
-                    -- restore collisions so loaded toys aren't noclipped
                     pcall(function()
                         for _, d in ipairs(toy:GetDescendants()) do
                             if d:IsA("BasePart") then
-                                -- skip pure helper parts that should stay non-collide
                                 if d.Name ~= "SoundPart" and d.Name ~= "HoldPart" and d.Name ~= "FirePlayerPart" then
                                     d.CanCollide = true
                                 end
@@ -43571,12 +44099,8 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 
                     local toy = nil
                     if SPAWNABLE_TOYS[entry.name] then
-                        -- spawnable: spawn above you then move
                         toy = tbl12.SpawnToy(entry.name, nil, 8, true)
                     else
-                        -- unspawnable: TP under nearest matching world toy, move it, TP back
-                        -- moveLikeRagdollPallet is defined below in this scope — call after it's defined
-                        -- handled in branch after helpers exist
                         toy = "UNSPAWNABLE"
                     end
 
@@ -43605,14 +44129,11 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                         anchored = tbl12.SetAnchored(toy, true) == true
                     end)
 
-                    -- Always pin stored CFrame to saved (hold system streams THIS to the network)
                     local st = tbl7.Anchored and tbl7.Anchored[toy]
                     if st then
                         st.CFrame = cf
                     end
 
-                    -- Post-anchor pulse: finite only (~0.4s). Does NOT leave permanent work.
-                    -- Permanent FPS was from DestroyToy not releasing objectStates (fixed separately).
                     task.spawn(function()
                         if flag11 or not toy or not toy.Parent then return end
                         local soundPart = toy:FindFirstChild("SoundPart")
@@ -43654,7 +44175,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                     report()
                 end
 
-                -- scrub leftover load helpers (BodyPositions etc.)
                 pcall(function()
                     for _, d in ipairs(workspace:GetDescendants()) do
                         if d.Name == "RSCBuildBP" then
@@ -43682,7 +44202,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
             return true
         end
 
-        -- Ghost preview (local-only transparent boxes at saved CFrames)
         local ghostFolder = nil
         local function clearGhostPreview()
             if ghostFolder then
@@ -43691,7 +44210,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                 end)
             end
             ghostFolder = nil
-            -- wipe leftovers anywhere (workspace + descendants)
             pcall(function()
                 local function wipe(parent)
                     if not parent then return end
@@ -43708,7 +44226,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                 if lp then
                     wipe(lp:FindFirstChild("PlayerGui"))
                 end
-                -- catch streamed / nested
                 for _, d in ipairs(workspace:GetDescendants()) do
                     if d.Name == "RSC_BuildGhost" then
                         pcall(function() d:Destroy() end)
@@ -43772,7 +44289,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
             return data
         end
 
-        -- Compact share code: RSCB1|<name>|<json entries>
         local function exportBuildCode(name)
             local data, err = readBuildData(name)
             if not data then return nil, err end
@@ -43801,7 +44317,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                 :gsub('[\\/:*?"<>|]', "")
                 :gsub("^%s+", ""):gsub("%s+$", "")
             if name == "" then name = "Imported" end
-            -- avoid overwrite: unique suffix if exists
             local base = name
             local i = 1
             while isfile and isfile(buildPath(name)) do
@@ -43822,7 +44337,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
             return name, #payload.e
         end
 
-        -- ---------------- UI ----------------
         v20 = anchorBuilds
 
         local saveList = v20:AddDropdown("AnchorBuildList", {
@@ -43834,7 +44348,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
             Searchable = true,
             Callback = function(v)
                 anchorState.Selected = v
-                -- auto ghost when selecting
                 if v and v ~= "" then
                     local data = readBuildData(v)
                     if data and not flag11 then
@@ -44032,13 +44545,10 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
             end,
         })
 
-        -- clear ghosts on unload path is handled if folder destroyed with workspace; also on load
         local oldLoadBuild = loadBuild
-        -- wrap: clear ghost when starting a real load (optional polish via Load button already)
 
         refreshList()
     end
-    -- ==========================================================
 
 	end
 
@@ -44438,7 +44948,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 		end
 	end
 
-	-- Ladder Spider removed
 
 		local Misc = tbl15.Toys:AddLeftGroupbox("Misc", "funnel")
 
@@ -44585,7 +45094,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		-- Dragon Wings removed from Coconut forms
 
 		local v22 = Forms:AddDependencyBox()
 		v22:SetupDependencies({ { options.CoconutFormsDropdown, "Cape" } })
@@ -44712,26 +45220,19 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		-- Tentacles removed from Coconut forms
 
 		Forms:AddLabel("CoconutFormsLimit", { Text = "0/20 coconuts used", DoesWrap = true })
 		if tbl12.UpdateCoconutBudget then
 			tbl12.UpdateCoconutBudget()
 		end
 
-		-- ============================================================
-		-- Pencil Control (Peak Toys)
-		-- RIGHT: Target (top) then Actions (below). LEFT: coconuts only.
-		-- =====
 		do
 			local peakTab = tbl15.ToysForms or tbl15.Toys
 			local PencilBox = peakTab:AddRightGroupbox("Pencil Target", "user")
 			local PencilAct = peakTab:AddRightGroupbox("Pencil Actions", "pencil")
 
-			-- Match working single-target dropdowns (TeleportTargets, ToysAura, …)
 			local pencilTargets = {}
 			tbl12.CreatePlayerDropdown(PencilBox, "PencilTarget", pencilTargets, false, false, function()
-				-- table is already updated by CreatePlayerDropdown
 			end, "Target")
 
 			local function getSelectedPlayer()
@@ -44745,7 +45246,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 						return name
 					end
 				end
-				-- fallback: dropdown option value
 				pcall(function()
 					local dd = options.PencilTargetDropdown
 					if dd and dd.Value then
@@ -44889,7 +45389,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				local spawnCf = (root.CFrame + Vector3.new(0, 12, 0)) * spawnRotation
 				local pencil = nil
 
-				-- Prefer script SpawnToy (handles queue / plot)
 				local okSpawn, result = pcall(function()
 					return tbl12.SpawnToy("ToolPencil", spawnCf, 5, true)
 				end)
@@ -44958,7 +45457,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 						tbl12.BreakHoldable(pencil)
 					end
 				end)
-				-- no network ownership (same style as Random Stick All)
 				return pencil, sticky, sound
 			end
 
@@ -44966,10 +45464,8 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				if not (pencil and sticky and target) then
 					return false
 				end
-				-- Grab 10-15x first (~0.2s) so we own it, then stick once.
 				tbl12.OwnershipBurst({ sound or sticky }, true)
 				fireSticky(sticky, target, cf)
-				-- Only wait for the weld now; the stick is not fired again.
 				local startedAt = os.clock()
 				while os.clock() - startedAt < 1.5 do
 					if not (pencil.Parent and sticky.Parent and target.Parent) then
@@ -45055,7 +45551,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end
 
 			local function doRandom()
-				-- HuiG-style Random Stick All: collect pencils, FireServer only, 0.01s between
 				local char = requireTarget()
 				if not char then
 					return
@@ -45104,7 +45599,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 							math.rad(math.random(0, 359)),
 							math.rad(math.random(0, 359))
 						)
-						-- direct remote like HuiG (no ownPart / align loop)
 						pcall(function()
 							if tbl11 and tbl11.StickyPartEvent then
 								tbl11.StickyPartEvent:FireServer(pencil.StickyPart, targetPart, randomCFrame)
@@ -45184,34 +45678,27 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		-- Protected toys: Gucci, Anti Kick (all styles), Anti Kick Item, Donut Beast, Anti Network Ownership
 		local function isProtectedToy(model)
 			if not model or not model:IsA("Model") then return true end
 			local n = model.Name
-			-- Gucci anti-grab vehicle
 			if n == "GucciRSC" or model:FindFirstChild("GucciBP") then
 				return true
 			end
-			-- Anti Kick styles (shuriken / katana / pencil)
 			if n == "ShurikenRSC" or n == "KatanaAntiKickRSC" or n == "PencilAntiKickRSC" then
 				return true
 			end
-			-- Anti Kick [Item] (Spooky Candle)
 			if n == "AntiKickItem" then
 				return true
 			end
-			-- Donut Beast
 			if n == "DonutBeastRSC" then
 				return true
 			end
 			if v18 and model == v18 then
 				return true
 			end
-			-- Anti Network Ownership (held AntiInputType food/tool)
 			if tbl8.AntiInputLag and n == tostring(tbl9.AntiInputType or "") then
 				return true
 			end
-			-- also protect if currently gripped by local character for AIL
 			if tbl8.AntiInputLag then
 				local hold = model:FindFirstChild("HoldPart")
 				local rc = hold and hold:FindFirstChild("RigidConstraint")
@@ -45271,7 +45758,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 		})
 
 		tbl12.ClearInventoryToys = function()
-			-- ONLY the local player's SpawnedInToys folder (not shop / plot / other inventories)
 			local list = {}
 			local inv = v17
 			if not inv or not inv.Parent then
@@ -45286,7 +45772,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end
 			local n = 0
 			for _, toy in ipairs(list) do
-				-- RagdollRSC is intentionally included; Gucci / AK / AIL skipped
 				pcall(function()
 					if tbl7.Anchored and tbl7.Anchored[toy] then
 						tbl12.SetAnchored(toy, false)
@@ -45307,7 +45792,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		-- Clear button on game "Put Toys Away" (ToyDestroy) tab — no full-GUI scans
 		task.spawn(function()
 			local function makeClearButton(parent)
 				if not parent or parent:FindFirstChild("RSC_ClearInv") then
@@ -45348,7 +45832,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				local toyDestroy = tabs:FindFirstChild("ToyDestroy")
 				if not toyDestroy then return false end
 
-				-- prefer Title bar ("Put Toys Away")
 				local title = toyDestroy:FindFirstChild("Title")
 				if title then
 					makeClearButton(title)
@@ -45358,7 +45841,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				return true
 			end
 
-			-- try a few times on load, then watch only for MenuGui (not every descendant)
 			for _ = 1, 20 do
 				if flag11 then return end
 				if hookToyDestroy() then return end
@@ -46309,15 +46791,11 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end
 		end
 
-		----------------------------------------------------------------------
-		-- Camera comfort: does NOT change sensitivity. Adds a light blur that
-		-- scales with how fast you turn, so spinning the camera is easier on the eyes.
-		----------------------------------------------------------------------
 		do
 			local function setupCameraComfort()
 			local MOTION_STEP = "HuiGCameraMotionEase"
 			local comfortEnabled = false
-			local comfortAmount = 5 -- 1–10 UI scale
+			local comfortAmount = 5
 			local lastLook = nil
 			local currentBlur = 0
 			local comfortBlur = nil
@@ -46394,15 +46872,12 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					local angular = 0
 					if lastLook then
 						local dot = math.clamp(lastLook:Dot(look), -1, 1)
-						angular = math.acos(dot) / dt -- rad/s
+						angular = math.acos(dot) / dt
 					end
 					lastLook = look
 
-					-- Map spin speed → blur. Amount 1–10 controls how strong the comfort blur is.
-					-- Does not touch CFrame / sensitivity.
 					local intensity = (comfortAmount or 5) / 10
 					local targetBlur = math.clamp((angular - 0.35) * 2.2 * intensity, 0, 6 * intensity + 2)
-					-- Smooth the blur itself so it doesn't flicker
 					local blend = 1 - math.exp(-10 * dt)
 					currentBlur = currentBlur + (targetBlur - currentBlur) * blend
 
@@ -47066,7 +47541,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		-- ============ 3D Blackhole Models (from HuiG) ============
         do
             local bh = {
                 enabled      = false,
@@ -47337,7 +47811,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                 if isBlackHoleHole(desc) then task.spawn(function() handleBlackHoleSpawn(desc) end) end
             end
 
-            -- ============ UI ============
             v23:AddDivider("3D Blackhole")
 
             v23:AddDropdown("BH3D_ModelSelect", {
@@ -47359,7 +47832,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                 Callback = function(v) bh.globalScale = v end,
             })
 
-            -- Particle tint always applied (no enable toggle)
             bh.tintEnabled = true
             v23:AddLabel("Particle Tint"):AddColorPicker("BH3D_TintColor", {
                 Default = Color3.fromRGB(255, 255, 255),
@@ -47465,7 +47937,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
                 end,
             }
         end
-        -- ============ end 3D Blackhole Models ============
 
 
 		local v24 = v20:AddTab(nil, "volume-2")
@@ -47808,9 +48279,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 		end
 	end
 
-    	-- ==========================================================
-	-- Tracer ESP (single, watches Target + Blobman lists)
-	-- ==========================================================
 	do
 		if not Drawing then
 			warn("[HuiG Custom] Drawing API not available — tracer disabled")
@@ -47870,7 +48338,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				for p in pairs(Tracers) do destroyTracer(p) end
 			end
 
-			-- Merge Target + Blobman selections into one set, respecting the two toggles
 			local function getActiveSet()
 				local set = {}
 				if state.ShowTarget then
@@ -47894,7 +48361,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				end
 			end
 
-			-- ---------------- UI ----------------
 			local toggle = box:AddToggle("Tracer_Enabled", {
 				Text = "Enable Tracer",
 				Default = false,
@@ -47965,7 +48431,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				Callback = function(v) state.RainbowSpeed = v end,
 			})
 
-			-- ---------------- Frame loop ----------------
 			local conn = RunService.RenderStepped:Connect(function()
 				if not state.Enabled then return end
 
@@ -47979,7 +48444,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				local camera = workspace.CurrentCamera
 				if not camera then return end
 
-				-- Origin: my own character projected to screen
 				local me = Players.LocalPlayer
 				local myChar = me and me.Character
 				local myRoot = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Torso"))
@@ -47998,7 +48462,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				if myOnScreen and myScreen.Z > 0 then
 					origin = Vector2.new(myScreen.X, myScreen.Y)
 				else
-					-- Fallback: bottom center (e.g. first person where you can't see your own torso)
 					local vp = camera.ViewportSize
 					origin = Vector2.new(vp.X * 0.5, vp.Y)
 				end
@@ -48014,7 +48477,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					else
 						local screenPos, onScreen = camera:WorldToViewportPoint(targetPart.Position)
 
-						-- ONLY draw when target is in front of the camera AND on screen
 						if onScreen and screenPos.Z > 0 then
 							local tip = Vector2.new(screenPos.X, screenPos.Y)
 
@@ -48050,7 +48512,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end)
 		end
 	end
-	-- ==========================================================
 
 	do
 		local selectedPlayersAC = tbl7.SelectedPlayersAC
@@ -48317,7 +48778,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				tbl7.ACRotation[limb] = setAxisVector(tbl7.ACRotation[limb], axis, value)
 				optionName = "ACRSec" .. axis .. "O" .. limb
 			end
-			-- data only (no option:SetValue) so Auto Slider cannot disturb other systems/UI
 			if optionName and options[optionName] then
 				pcall(function()
 					if options[optionName].Value ~= nil then
@@ -49239,7 +49699,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			local plr = Players:FindFirstChild(v20.Parent.Name)
 			if not plr or plr == localPlayer then return end
 			if tbl12.IsProtectedPlayer(plr) then return end
-			-- uses Resonance's own Fling (spawn tool + velocity) same as Combat aura
 			tbl12.Fling(plr)
 		end)
 
@@ -49445,11 +49904,10 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				end
 
 				local function collectAssignments()
-					local map = {} -- key -> { label, label, ... }
+					local map = {}
 					local function add(key, label)
 						if not key or key == "" or key == "None" or key == "nil" then return end
 						local k = tostring(key):upper()
-						-- normalize to keyboard display labels
 						if k == "SPACE" or k == " " then k = "SPACE" end
 						if k == "RETURN" then k = "ENTER" end
 						if k == "LEFTSHIFT" or k == "RIGHTSHIFT" then k = "SHIFT" end
@@ -49492,7 +49950,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 							local label = opt.Text or name
 							local val = opt.Value
 							if type(val) == "table" then
-								-- { Key, Mode, Modifiers } style
 								local key = val[1] or val.Value or val.Key
 								add(key, label)
 								local mods = val[3] or val.Modifiers
@@ -49502,7 +49959,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 									end
 								end
 							elseif type(val) == "string" then
-								-- may be "Ctrl+Shift:F" or just "F"
 								local key = val
 								if val:find(":") then
 									local mods, k = val:match("^(.*):(.*)$")
@@ -49541,7 +49997,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				local function corner(r) return make("UICorner", { CornerRadius = UDim.new(0, r) }) end
 				local function stroke(color, transparency) return make("UIStroke", { Color = color, Transparency = transparency or 0, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }) end
 
-				-- Real 75% layout, widths in key units. Every row adds up to 15 units so edges line up.
 				local rows = {
 					{ { "ESC" }, { "F1" }, { "F2" }, { "F3" }, { "F4" }, { "F5" }, { "F6" }, { "F7" }, { "F8" }, { "F9" }, { "F10" }, { "F11" }, { "F12" } },
 					{ { "`" }, { "1" }, { "2" }, { "3" }, { "4" }, { "5" }, { "6" }, { "7" }, { "8" }, { "9" }, { "0" }, { "-" }, { "=" }, { "BACKSPACE", 2 } },
@@ -49550,7 +50005,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					{ { "SHIFT", 2.25 }, { "Z" }, { "X" }, { "C" }, { "V" }, { "B" }, { "N" }, { "M" }, { "," }, { "." }, { "/" }, { "SHIFT", 1.75 }, { "UP" } },
 					{ { "CTRL", 1.25 }, { "WIN", 1.25 }, { "ALT", 1.25 }, { "SPACE", 6.25 }, { "ALT" }, { "CTRL" }, { "LEFT" }, { "DOWN" }, { "RIGHT" } },
 				}
-				local ARROW_GLYPH = {} -- plain words: arrow glyphs are not in every Roblox font
+				local ARROW_GLYPH = {}
 
 				local UNIT, KEY_H, GAP, PAD = 44, 40, 4, 16
 				local boardW = 15 * UNIT + 14 * GAP
@@ -49584,7 +50039,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					make("UIScale", { Scale = lib.DPIScale, Parent = frame })
 				end
 
-				-- header (drag handle)
 				local header = make("TextButton", {
 					Name = "Header",
 					Size = UDim2.new(1, 0, 0, HEADER_H),
@@ -49643,7 +50097,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 				local closeBtn = headerButton("X", -PAD, 28)
 				local refreshBtn = headerButton("Refresh", -PAD - 34, 76)
 
-				-- info bar
 				local info = make("Frame", {
 					Position = UDim2.new(0, PAD, 1, -PAD - INFO_H),
 					Size = UDim2.new(1, -PAD * 2, 0, INFO_H),
@@ -49734,7 +50187,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 							keyStroke.Parent = btn
 
 							if taken then
-								-- small badge: how many things use this key
 								make("TextLabel", {
 									AnchorPoint = Vector2.new(1, 0),
 									Position = UDim2.new(1, -3, 0, 3),
@@ -49775,7 +50227,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					tbl12._KeyMapGui = nil
 				end)
 
-				-- drag by the header
 				local dragging, dragStart, startPos
 				header.InputBegan:Connect(function(input)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -49957,8 +50408,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 					local gradients = tbl7.Gradients
 
 					while task.wait(0.5) and tbl8.GradientLine and not flag11 do
-						-- Let the Settings black-to-cyan preset take priority without
-						-- killing this loop; the user's configured gradient resumes when it is disabled.
 						if tbl8.ResonanceBlackCyanLine then
 							continue
 						end
@@ -50743,7 +51192,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 		end,
 	})
 
-	-- Scoreboard: only auto-detected (AlreadyFlaggedCheaters / CheaterScoreboard)
 	local scoreLabel = CheatersGB:AddLabel("Scoreboard: (none yet)", true)
 	tbl12.RefreshCheaterScoreboard = function()
 		local board = tbl7.CheaterScoreboard or {}
@@ -50873,7 +51321,8 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 	})
 
 	do
-		local Whitelist = tbl15.Lists:AddLeftGroupbox("Whitelist", "shield-check")
+		tbl7.WhitelistTabbox = tbl15.Lists:AddLeftGroupbox("Whitelist", "shield-check"):AddTabbox({ PopOut = false })
+		local Whitelist = tbl7.WhitelistTabbox:AddTab("Players", "shield-check")
 		local v20 = tbl12.CreatePlayerDropdown(Whitelist, "Whitelist", tbl7.Whitelisted)
 
 		v20:OnChanged(function()
@@ -50987,7 +51436,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 	end
 
 	do
-		local AnchorWhitelist = tbl15.Lists:AddLeftGroupbox("Anchor Whitelist", "anchor")
+		local AnchorWhitelist = tbl7.WhitelistTabbox:AddTab("Anchor", "anchor")
 		tbl12.CreatePlayerDropdown(AnchorWhitelist, "AnchorWhitelist", tbl7.AnchorWhitelisted)
 		AnchorWhitelist:AddLabel("Selected players can move your anchored toys. When they let go, the toy re-anchors where they dropped it.", true)
 	end
@@ -51019,6 +51468,67 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
+		local function applyImmuneAKChoice()
+			local preset
+			if options.ImmunityAKSource and options.ImmunityAKSource.Value == "Saved" then
+				local name = options.ImmunityAKSaved and options.ImmunityAKSaved.Value
+				preset = name and tbl12.AKReadSavedPreset and tbl12.AKReadSavedPreset(name)
+				if name and not preset then
+					fn18(("Couldn't load %q"):format(name), "Give Anti-Kick")
+				end
+			else
+				local name = options.ImmunityAKBuiltin and options.ImmunityAKBuiltin.Value
+				for _, builtin in ipairs(tbl12.AKBuiltinPresets or {}) do
+					if builtin.Name == name then
+						preset = builtin
+						break
+					end
+				end
+			end
+			if preset then
+				tbl9.ImmuneAKPreset = preset
+			end
+		end
+
+		local immuneAKBox = Immunity:AddDependencyBox()
+		immuneAKBox:SetupDependencies({ { toggles.ImmunityAKToggle, true } })
+		immuneAKBox:AddDropdown("ImmunityAKSource", {
+			Text = "Anti-Kick",
+			Values = { "Built-In", "Saved" },
+			ValueImages = { ["Built-In"] = "library", Saved = "folder-open" },
+			Default = "Built-In",
+			Callback = applyImmuneAKChoice,
+		})
+
+		local immuneAKBuiltinBox = immuneAKBox:AddDependencyBox()
+		immuneAKBuiltinBox:SetupDependencies({ { options.ImmunityAKSource, "Built-In" } })
+		immuneAKBuiltinBox:AddDropdown("ImmunityAKBuiltin", {
+			Text = "Preset",
+			Values = tbl12.AKBuiltinNames or { "Default" },
+			ValueImages = tbl12.AKBuiltinImages,
+			Default = "Default",
+			Callback = applyImmuneAKChoice,
+		})
+
+		local immuneAKSavedBox = immuneAKBox:AddDependencyBox()
+		immuneAKSavedBox:SetupDependencies({ { options.ImmunityAKSource, "Saved" } })
+		local immuneAKSavedList = immuneAKSavedBox:AddDropdown("ImmunityAKSaved", {
+			Text = "Saved Preset",
+			Values = tbl12.AKListSavedPresets and tbl12.AKListSavedPresets() or {},
+			AllowNull = true,
+			Default = nil,
+			Callback = applyImmuneAKChoice,
+		})
+		immuneAKSavedBox:AddButton({
+			Text = "Refresh",
+			Icon = "refresh-cw",
+			Func = function()
+				if tbl12.AKListSavedPresets then
+					immuneAKSavedList:SetValues(tbl12.AKListSavedPresets())
+				end
+			end,
+		})
+
 		Immunity:AddToggle("ImmunityAEToggle", {
 			Text = "Give Anti-Explosion",
 			Default = false,
@@ -51031,21 +51541,17 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 	end
 
 	do
-		local Menu = tbl15.Settings:AddLeftGroupbox("Menu", "wrench")
+		local menuTabs = tbl15.Settings:AddLeftGroupbox("Menu", "panels-top-left"):AddTabbox({ PopOut = false })
+		local Menu = menuTabs:AddTab("Controls", "keyboard")
+		local wmTab = menuTabs:AddTab("Watermark", "tag")
 		Menu:AddLabel("Menu Keybind"):AddKeyPicker("menukey", { Text = "Menu Keybind", Mode = "Toggle", Default = "RightShift", NoUI = false })
 		lib.ToggleKeybind = options.menukey
 
-		-- Watermark: own box with tabs (Elements / Style / Colors). Control IDs of the old
-		-- watermark options are kept so saved configs still load.
-		local watermarkTabs = tbl15.Settings:AddLeftGroupbox("Watermark", "type"):AddTabbox({ PopOut = false })
-		local wmElementsTab = watermarkTabs:AddTab("Elements", "list")
-		local wmStyleTab = watermarkTabs:AddTab("Style", "palette")
-		local wmColorsTab = watermarkTabs:AddTab("Colors", "paint-bucket")
+		local wmElementsTab, wmStyleTab = wmTab, wmTab
 		local function setWatermarkStyle(key, value)
 			if tbl12.SetWatermarkStyle then tbl12.SetWatermarkStyle(key, value) end
 		end
 
-		-- Elements -------------------------------------------------------------
 		wmElementsTab:AddToggle("WatermarkT", {
 			Default = true,
 			Text = "Watermark",
@@ -51116,7 +51622,8 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		-- Style ----------------------------------------------------------------
+		wmStyleTab:AddDivider("Style")
+
 		wmStyleTab:AddDropdown("WatermarkPosition", {
 			Values = { "Custom", "Top Center", "Top Left", "Top Right", "Bottom Left", "Bottom Center", "Bottom Right" },
 			Default = 1,
@@ -51141,41 +51648,12 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		wmStyleTab:AddDropdown("WatermarkFont", {
-			Values = { "Theme", "Gotham", "Montserrat", "Ubuntu", "SourceSans", "Code", "RobotoMono", "FredokaOne", "Arcade" },
-			Default = 1,
-			Multi = false,
-			Text = "Font",
-			Callback = function(value) setWatermarkStyle("Font", value) end,
-		})
-
 		wmStyleTab:AddDropdown("WatermarkSeparator", {
 			Values = { "·", "|", "/", "•", "—", "Space" },
 			Default = 1,
 			Multi = false,
 			Text = "Separator",
 			Callback = function(value) setWatermarkStyle("Separator", value) end,
-		})
-
-		wmStyleTab:AddDropdown("WatermarkClock", {
-			Values = { "24h", "12h" },
-			Default = 1,
-			Multi = false,
-			Text = "Clock",
-			Callback = function(value) setWatermarkStyle("Clock", value) end,
-		})
-
-		wmStyleTab:AddToggle("WatermarkSeconds", {
-			Text = "Show Seconds",
-			Default = true,
-			Callback = function(value) setWatermarkStyle("Seconds", value) end,
-		})
-
-		wmStyleTab:AddToggle("WatermarkQuality", {
-			Text = "Color FPS & Ping",
-			Default = true,
-			Tooltip = "Green / yellow / red depending on how good they are",
-			Callback = function(value) setWatermarkStyle("QualityColors", value) end,
 		})
 
 		wmStyleTab:AddSlider("WatermarkCorner", {
@@ -51205,35 +51683,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end
 		end)
 
-		-- Colors ---------------------------------------------------------------
-		wmColorsTab:AddToggle("WatermarkCustomColors", {
-			Text = "Custom Colors",
-			Default = false,
-			Tooltip = "Off = follow the menu theme",
-			Callback = function(value) setWatermarkStyle("CustomColors", value) end,
-		})
-
-		local function watermarkColorRow(label, idx, styleKey, default)
-			wmColorsTab:AddLabel(label):AddColorPicker(idx, {
-				Default = default,
-				Title = "Watermark " .. label,
-				Callback = function(color) setWatermarkStyle(styleKey, color) end,
-			})
-		end
-		watermarkColorRow("Text", "WatermarkTextColor", "TextColor", Color3.new(1, 1, 1))
-		watermarkColorRow("Accent", "WatermarkAccentColor", "AccentColor", Color3.new(1, 1, 1))
-		watermarkColorRow("Background", "WatermarkBgColor", "BgColor", Color3.fromRGB(25, 25, 28))
-		watermarkColorRow("Outline", "WatermarkOutlineColor", "OutlineColor", Color3.fromRGB(55, 58, 61))
-
-		wmColorsTab:AddSlider("WatermarkBgTransparency", {
-			Text = "Background Transparency",
-			Default = 0,
-			Min = 0,
-			Max = 1,
-			Rounding = 2,
-			Compact = true,
-			Callback = function(value) setWatermarkStyle("BgTransparency", value) end,
-		})
 		Menu:AddDivider("Keybind Menu")
 
 		Menu:AddToggle("KeybindMenuOpen", {
@@ -51263,7 +51712,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			Callback = function(modal)
 				textButton.Modal = modal
 				UserInputService.MouseIconEnabled = modal
-				-- Turning unlock off must not leave the cursor frozen at its last position.
 				if not modal and UserInputService.MouseBehavior == Enum.MouseBehavior.LockCurrentPosition then
 					UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 				end
@@ -51436,9 +51884,6 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		-- Compact preset from the older HuiG script: black fading into cyan-green.
-		-- The existing Gradient Line feature is paused while this preset is on and
-		-- resumes automatically if it had already been enabled.
 		Display:AddDivider("Grab Line")
 		local linePresetRestoreGradient = false
 		local function getLineColorEvent()
@@ -51574,18 +52019,18 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 	end
 
 	do
-		local Notifications = tbl15.Settings:AddRightGroupbox("Notifications", "bell-ring")
+		local NotificationsGroup = tbl15.Settings:AddRightGroupbox("Notifications", "bell")
 
 		local tbl16 = {
-			peak = 139746569667955,
+			Default = 139746569667955,
 			Pop = 124815381429574,
 			["Bubble Pop"] = 106994752352532,
 			Steam = 18317665126,
 			Loaded = 71450094482101,
 		}
 
-		Notifications:AddToggle("NotificationMaster", {
-			Text = "Master Switch",
+		NotificationsGroup:AddToggle("NotificationMaster", {
+			Text = "Enabled",
 			Default = true,
 			Tooltip = "Enables or disables every HuiG Custom notification",
 			Callback = function(enabled)
@@ -51593,9 +52038,15 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		Notifications:AddDropdown("NotificationReceivers", {
+		local notificationTabs = NotificationsGroup:AddTabbox({ PopOut = false })
+		local notifGeneral = notificationTabs:AddTab("General", "bell")
+		local notifSound = notificationTabs:AddTab("Sound", "volume-2")
+		local notifMessages = notificationTabs:AddTab("Messages", "message-square")
+
+		notifGeneral:AddDropdown("NotificationReceivers", {
 			Text = "Event Notifications",
 			Values = { "Kicked Player", "Player Left", "Player Rejoined" },
+			ValueImages = { ["Kicked Player"] = "user-round-x", ["Player Left"] = "log-out", ["Player Rejoined"] = "log-in" },
 			Default = { "Kicked Player", "Player Left", "Player Rejoined" },
 			Multi = true,
 			AllowNull = true,
@@ -51606,12 +52057,11 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		Notifications:AddDivider("Appearance")
-
-		Notifications:AddDropdown("NotifDropdown", {
-			Text = "Presets",
-			Values = { "peak", "Pop", "Steam", "Bubble Pop", "Loaded" },
-			Default = "peak",
+		notifSound:AddDropdown("NotifDropdown", {
+			Text = "Preset",
+			Values = { "Default", "Pop", "Steam", "Bubble Pop", "Loaded" },
+			ValueImages = { Default = "rotate-ccw" },
+			Default = "Default",
 			Multi = false,
 			Callback = function(arg)
 				if tbl16[arg] then
@@ -51621,7 +52071,7 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		Notifications:AddInput("CustomNotificationSound", {
+		notifSound:AddInput("CustomNotificationSound", {
 			Text = "Sound ID/MP3 Link",
 			Placeholder = "Roblox sound ID or direct .mp3 link",
 			Default = "139746569667955",
@@ -51639,8 +52089,9 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		Notifications:AddDropdown("NotificationSide", {
+		notifGeneral:AddDropdown("NotificationSide", {
 			Values = { "Left", "Right" },
+			ValueImages = { Left = "arrow-left", Right = "arrow-right" },
 			Default = "Right",
 			Text = "Notification Side",
 			Callback = function(arg)
@@ -51648,27 +52099,19 @@ local groundLift = hipHeight > 0.5 and (hipHeight + 0.5) or 2.0
 			end,
 		})
 
-		Notifications:AddSlider("NotifVolumeSlider", {
+		notifSound:AddSlider("NotifVolumeSlider", {
 			Text = "Volume",
 			Default = n35,
 			Min = 0,
 			Max = 10,
 			Rounding = 1,
+			Compact = true,
 			Callback = function(arg)
 				n35 = arg
 			end,
 		})
 
-		Notifications:AddButton({
-			Text = "Test Notification",
-			Func = function()
-				fn18("This is how your notifications currently look.", "Notification Test", nil, nil, true)
-			end,
-		})
-
-		Notifications:AddDivider("Event Messages")
-
-		Notifications:AddLabel({
+		notifMessages:AddLabel({
 			Text = [[Variables are replaced automatically:
 Kicked: %kickedPlayer%
 Left: %leftPlayer%, %listCount%
@@ -51676,7 +52119,7 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
 			DoesWrap = true,
 		})
 
-		Notifications:AddInput("KickedPlayerNotification", {
+		notifMessages:AddInput("KickedPlayerNotification", {
 			Text = "Kicked Player Message",
 			Default = tbl7.NotificationSettings.Templates["Kicked Player"],
 			ClearTextOnFocus = false,
@@ -51687,7 +52130,7 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
 			end,
 		})
 
-		Notifications:AddInput("LeftPlayerNotification", {
+		notifMessages:AddInput("LeftPlayerNotification", {
 			Text = "Player Left Message",
 			Default = tbl7.NotificationSettings.Templates["Player Left"],
 			ClearTextOnFocus = false,
@@ -51698,7 +52141,7 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
 			end,
 		})
 
-		Notifications:AddInput("RejoinedPlayerNotification", {
+		notifMessages:AddInput("RejoinedPlayerNotification", {
 			Text = "Player Rejoined Message",
 			Default = tbl7.NotificationSettings.Templates["Player Rejoined"],
 			ClearTextOnFocus = false,
@@ -51706,6 +52149,14 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
 			EmptyReset = "%rejoinedPlayer% rejoined and was restored to %listCount% list(s).",
 			Callback = function(arg)
 				tbl7.NotificationSettings.Templates["Player Rejoined"] = tostring(arg)
+			end,
+		})
+
+		NotificationsGroup:AddButton({
+			Text = "Test Notification",
+			Icon = "bell-ring",
+			Func = function()
+				fn18("This is how your notifications currently look.", "Notification Test", nil, nil, true)
 			end,
 		})
 	end
@@ -51919,7 +52370,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
 	lib3:SetFolder("Resonance/FTAP")
 	lib3:BuildConfigSection(tbl15.Settings)
 
-	-- full config: also persist mobile button positions
 	lib3.GetExtraSaveData = function()
 		local extra = { mobileButtons = {} }
 		pcall(function()
@@ -51967,8 +52417,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
 
 	lib3:LoadAutoloadConfig()
 
-	-- Reset the initial watermark layout after autoload so older saved positions
-	-- do not override the HuiG default (top-center, 56 px below the top edge).
 	task.defer(function()
 		pcall(function()
 			if Watermark and Watermark.Label and Watermark.Label.Parent then
@@ -51978,7 +52426,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
 		end)
 	end)
 
-	-- Force Savitar UI look after autoload (autoload may have applied a saved theme)
 	task.defer(function()
 		pcall(function()
 			lib.Scheme.BackgroundColor = Color3.fromHex("19191c")
@@ -51986,7 +52433,7 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
 			lib.Scheme.AccentColor = Color3.fromHex("ffffff")
 			lib.Scheme.OutlineColor = Color3.fromHex("373a3d")
 			lib.Scheme.FontColor = Color3.fromHex("ffffff")
-			lib.Scheme.Font = Font.fromEnum(Enum.Font.Gotham)
+			lib.Scheme.Font = Font.fromEnum(Enum.Font.Roboto)
 			lib.CornerRadius = 10
 			lib.IsLightTheme = false
 			if type(lib.UpdateColorsUsingRegistry) == "function" then
@@ -52044,19 +52491,15 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
 		toggles.AlwaysOnToggleAB:SetDisabled(true)
 	end
 
-	-- Savitar 1:1 palette (keep Resonance branding, match Savitar look)
 	lib2:SetDefaultTheme({
 		BackgroundColor = Color3.fromHex("19191c"),
 		MainColor = Color3.fromHex("262729"),
 		AccentColor = Color3.fromHex("ffffff"),
 		OutlineColor = Color3.fromHex("373a3d"),
 		FontColor = Color3.fromHex("ffffff"),
-		FontFace = "Gotham",
+		FontFace = "Roboto",
 	})
 
-        -- ==========================================================
-    --  3D Blackhole Models (ported from HuiG)
-    -- ==========================================================
     do
         local bh = {
             enabled      = false,
@@ -52327,7 +52770,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
             if isBlackHoleHole(desc) then task.spawn(function() handleBlackHoleSpawn(desc) end) end
         end
 
-        -- expose for UI callbacks
         _G.ResonanceBH3D = {
             state = bh,
             presets = bhPresetOrders or bhPresetOrder,
@@ -52347,11 +52789,9 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
             end,
         }
     end
-    -- ==========================================================
 
 
 
-	-- Peak Visuals: Shader + Beach (1:1 from Savitar)
 	do
 		local Peak = tbl15.PeakVisuals
 		if Peak then
@@ -52362,8 +52802,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
 			local LocalPlayer = Players.LocalPlayer
 			local TweenService = game:GetService("TweenService")
 
-		-- SHADER SYSTEM
-		------------------------------------------------------------
 		local ScarletPreset = {
 			Lighting = {
 				Brightness = 2.14,
@@ -52908,7 +53346,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
 
 		saveOriginal()
 
-		-- Shader UI
 		local ShaderBox = Peak:AddLeftGroupbox("<b>Shader</b>", "sparkles")
 
 		ShaderBox:AddCheckbox("ShaderToggle", {
@@ -52972,12 +53409,9 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
 		})
 
 
-		------------------------------------------------------------
-		-- BEACH SYSTEM (1:1 from Savitar Visual tab)
-		------------------------------------------------------------
 		local BeachBox = Peak:AddRightGroupbox("<b>Beach</b>", "tree-palm")
 		local v72 = BeachBox
-		local flag37 = false -- external flag used by sound proximity system
+		local flag37 = false
 
 		do
 			flag38 = false
@@ -54451,12 +54885,8 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
 				v72:AddLabel("<b>Use Anti Kick</b>")
 
 
-		------------------------------------------------------------
 
 			local ForestCleanup
-            -- ============================================================
-            -- Savitar Forest port (models, ambience, river proximity sound)
-            -- ============================================================
             do
                 local ForestBox = Peak:AddLeftGroupbox("<b>Forest</b>", "tree-pine")
                 local ForestRunService = game:GetService("RunService")
@@ -54489,7 +54919,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
                     { name = "HuiG", assetId = "102653559929681", cframe = CFrame.fromMatrix(Vector3.new(-92, 146, -1629), Vector3.new(0.8192, 0, 0.5736), Vector3.new(0, 1, 0), Vector3.new(-0.5736, 0, 0.8192)) },
                 }
 
-                -- These are the game-world parts Savitar hides so the Forest assets render cleanly.
                 local ForestCleanupTargets = {
                     { name = "Кусты", legacyName = "ÐšÑƒÑÑ‚Ñ‹", pos = Vector3.new(-157.23575, 62.350605, -517.2822) },
                     { name = "Кусты", legacyName = "ÐšÑƒÑÑ‚Ñ‹", pos = Vector3.new(-236.85118, 62.35659, -495.9508) },
@@ -54627,7 +55056,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
 
                 local function forestPostLoadCleanup(generation)
                     task.spawn(function()
-                        -- Match Savitar's cleanup of the large pre-existing Model container.
                         for attempt = 1, 60 do
                             if not ForestActive or generation ~= ForestLoadGeneration then return end
                             local pending = false
@@ -55086,15 +55514,10 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
                 })
                 forestRiverVolumeBox:SetupDependencies({ { ForestSoundDropdown, "River Sound" } })
 
-                -- Called by the library's UI-unload cleanup hook below.
                 ForestCleanup = forestRestoreAndDestroyModels
             end
-            -- ======================= End Savitar Forest ======================
 
 
-        ----------------------------------------------------------------------
-        -- Savitar Liquid-Glass Toy Inventory/Menu (ported with full teardown)
-        ----------------------------------------------------------------------
         local LiquidGlassState = {
             Active = false,
             Connections = {},
@@ -55126,18 +55549,13 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
                 "gradient", "rejoin", "rj", "black", "dark", "logo",
                 "close", "exit",
             },
-            -- Always style these (never treat as protected), even if a keyword matches.
-            -- Toy display names / model ids that collide with Keywords substrings:
-            --   dark  → BombDarkMatter, *DarkGray chairs/couches/ovens
-            --   black → FridgeBlack
-            --   color → DiscoColorBall
             ForceStyle = {
-                BombDarkMatter = true,   -- Unstable Substance
-                ArmChairDarkGray = true, -- Arm Chair (dark gray)
-                CouchDarkGray = true,    -- Couch (dark gray)
-                OvenDarkGray = true,     -- Oven (dark gray)
-                FridgeBlack = true,      -- Refrigerator
-                DiscoColorBall = true,   -- Disco Cube
+                BombDarkMatter = true,
+                ArmChairDarkGray = true,
+                CouchDarkGray = true,
+                OvenDarkGray = true,
+                FridgeBlack = true,
+                DiscoColorBall = true,
             },
         }
 
@@ -55215,9 +55633,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
         end
 
         local function liquidGlassProtected(instance)
-            -- Toy cells must always get glass + hover. Their model ids often contain
-            -- keyword substrings ("dark", "black", "color") which would otherwise
-            -- mark the whole cell as protected. SPAWNABLE_TOYS is the full shop list.
             local forceStyle = LiquidGlassConfig.ForceStyle
             local function isToyCellName(name)
                 if not name or name == "" then
@@ -55356,11 +55771,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
                 return
             end
 
-            -- The toy grid uses its own Frame/ScrollingFrame surface, separate from
-            -- Menu. Roblox rewrites that surface when a toy is spawned, which made
-            -- the inventory panel turn solid white even while Menu stayed glassy.
-            -- Guard each game-owned container as it is styled (including protected
-            -- descendants) so a later reset cannot reintroduce the opaque panel.
             local isPanelSurface = instance:IsA("Frame") or instance:IsA("ScrollingFrame")
             if isPanelSurface
                 and not LiquidGlassState.CreatedSet[instance]
@@ -55375,8 +55785,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
                     end
                 end
 
-                -- Capture the original values only once so disabling Liquid Glass
-                -- still restores the game's initial appearance.
                 liquidGlassSet(instance, "BackgroundTransparency", 1)
                 liquidGlassSet(instance, "BorderSizePixel", 0)
                 liquidGlassConnect(instance:GetPropertyChangedSignal("BackgroundTransparency"), enforceTransparentPanel)
@@ -55502,7 +55910,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
                 controlBar.ZIndex = 10000
             end
 
-            -- Hide original clear (keeps its connections) and draw a Rejoin-identical stand-in.
             liquidGlassRemember(clearButton, "Visible")
             liquidGlassRemember(clearButton, "Parent")
             liquidGlassRemember(clearButton, "Position")
@@ -55540,7 +55947,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
             stroke.Transparency = 0.4
             stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-            -- No hover tween (Rejoin has none). One click fires the real clear button.
             liquidGlassConnect(button.MouseButton1Click, function()
                 if not LiquidGlassState.Active or not button.Parent then return end
                 local fired = false
@@ -55563,7 +55969,6 @@ Rejoined: %rejoinedPlayer%, %listCount%]],
                     end)
                 end
                 if not fired then
-                    -- Last resort: briefly re-enable original under cursor and click via VIM
                     pcall(function()
                         clearButton.Visible = true
                         clearButton.ZIndex = 10001
@@ -55647,9 +56052,698 @@ local function liquidGlassCreateRejoin(menu)
             end)
         end
 
+        local LiquidGlassToyNames = {
+            PalletLightBrown = "Pallet",
+            BallSnowball = "Snowball",
+            BombBalloon = "Balloon Bomb",
+            BombDarkMatter = "Dark Matter Bomb",
+            BombMissile = "Missile",
+            ArmChairBlue = "Armchair (Blue)",
+            ArmChairBrownGray = "Armchair (Brown/Gray)",
+            ArmChairDarkGray = "Armchair (Dark Gray)",
+            ArmChairLightBrownGray = "Armchair (Light Brown)",
+            ArmChairPink = "Armchair (Pink)",
+            ArmChairWhite = "Armchair (White)",
+            BathroomShower = "Shower",
+            BathroomSink = "Sink",
+            BedBlanketBlue = "Bed (Blue)",
+            BedFramedOrange = "Bed (Orange)",
+            BedFuton = "Futon",
+            ChildrensChair = "Kids Chair",
+            ChildrensCouch = "Kids Couch",
+            ChildrensDesk = "Kids Desk",
+            ChildrensShelf = "Kids Shelf",
+            ChildrensTable = "Kids Table",
+            ChildrensTableBench = "Kids Table Bench",
+            ChildrensTableBenchSmall = "Kids Bench (Small)",
+            ClockAlarm = "Alarm Clock",
+            ComputerLaptopOld = "Old Laptop",
+            CouchBlue = "Couch (Blue)",
+            CouchBrownGray = "Couch (Brown/Gray)",
+            CouchDarkGray = "Couch (Dark Gray)",
+            CouchLightBrownGray = "Couch (Light Brown)",
+            CouchPink = "Couch (Pink)",
+            CouchWhite = "Couch (White)",
+            CounterCorner = "Counter (Corner)",
+            CounterSink = "Counter (Sink)",
+            CounterStraight = "Counter (Straight)",
+            FactoryBench = "Factory Bench",
+            FactoryCabinet = "Factory Cabinet",
+            FactoryChair = "Factory Chair",
+            FactoryCouch = "Factory Couch",
+            FactoryDesk = "Factory Desk",
+            FactoryDeskMini = "Factory Mini Desk",
+            FactoryLight = "Factory Light",
+            FactoryShelf = "Factory Shelf",
+            FactoryTable = "Factory Table",
+            FanElectricLittle = "Electric Fan",
+            FanPaper = "Paper Fan",
+            FridgeBlack = "Fridge (Black)",
+            FutureAngularDesk = "Futuristic Desk",
+            JukeboxBlue = "Jukebox (Blue)",
+            JukeboxOrange = "Jukebox (Orange)",
+            JapaneseBanner = "Japanese Banner",
+            JapaneseBench = "Japanese Bench",
+            JapaneseChair = "Japanese Chair",
+            JapaneseCouch = "Japanese Couch",
+            JapaneseDeskMini = "Japanese Mini Desk",
+            JapaneseDresser = "Japanese Dresser",
+            JapaneseLantern = "Japanese Lantern",
+            JapaneseShelf = "Japanese Shelf",
+            JapaneseTable = "Japanese Table",
+            LadderLightBrown = "Ladder",
+            LightLampGray = "Floor Lamp",
+            MachineWasher = "Washing Machine",
+            NormalBench = "Bench",
+            NormalDesk = "Desk",
+            NormalCabinet = "Cabinet",
+            NormalShelves = "Shelves",
+            OvenBlack = "Oven (Black)",
+            OvenDarkGray = "Oven (Dark Gray)",
+            OvenLightGray = "Oven (Light Gray)",
+            OvenMicrowaveWhite = "Microwave",
+            OvenRusty = "Rusty Oven",
+            PlantPottedBonsai = "Bonsai",
+            PlantPottedCactus = "Cactus",
+            PlantPottedTree = "Potted Tree",
+            PlantPottedTreeChristmas = "Christmas Tree",
+            RedGateGong = "Gong",
+            SpookyBench = "Spooky Bench",
+            SpookyCabinet = "Spooky Cabinet",
+            SpookyChair = "Spooky Chair",
+            SpookyCouch = "Spooky Couch",
+            SpookyDesk = "Spooky Desk",
+            SpookyStool = "Spooky Stool",
+            SpookyShelf = "Spooky Shelf",
+            SpookyTable = "Spooky Table",
+            TableLunchTable = "Lunch Table",
+            TableSmallLabTable = "Lab Table",
+            TableWoodFourLegsBrown = "Wood Table (4 Legs)",
+            TableWoodTwoLegs = "Wood Table (2 Legs)",
+            TelevisionFlatscreen = "Flatscreen TV",
+            TelevisionGray = "Old TV",
+            ToiletGold = "Toilet (Gold)",
+            ToiletWhite = "Toilet (White)",
+            Airhorn = "Airhorn",
+            Boombox = "Boombox",
+            BubbleBlower = "Bubble Blower",
+            BucketPaint = "Paint Bucket",
+            Campfire = "Campfire",
+            CreatureBlobman = "Blobman",
+            CreatureRobot = "Robot",
+            DiscoColorBall = "Disco Ball",
+            FireExtinguisher = "Fire Extinguisher",
+            FireworkSmokeBomb = "Smoke Bomb",
+            FireworkMissile = "Firework Missile",
+            FireworkSparkler = "Sparkler",
+            FloatingIsland = "Floating Island",
+            FlyingToyHelicopter = "Helicopter",
+            FlyingToyPlane = "Plane",
+            FlyingToyUfo = "UFO",
+            FoodHotSauce = "Hot Sauce",
+            InstrumentBrassBugle = "Bugle",
+            InstrumentBrassTrumpet = "Trumpet",
+            InstrumentBrassVuvuzela = "Vuvuzela",
+            InstrumentDrumBongos = "Bongos",
+            InstrumentDrumSnare = "Snare Drum",
+            InstrumentGuitarAcoustic = "Acoustic Guitar",
+            InstrumentGuitarBanjo = "Banjo",
+            InstrumentGuitarLyre = "Lyre",
+            InstrumentGuitarUkulele = "Ukulele",
+            InstrumentGuitarViolin = "Violin",
+            InstrumentPianoKeyboard = "Piano Keyboard",
+            InstrumentPianoMelodica = "Melodica",
+            InstrumentVoiceMicrophone = "Microphone",
+            InstrumentWoodwindOcarina = "Ocarina",
+            InstrumentWoodwindSaxophone = "Saxophone",
+            MidiMaker = "MIDI Maker",
+            MusicKeyboard = "Music Keyboard",
+            NinjaKatana = "Katana",
+            NinjaKunai = "Kunai",
+            NinjaShuriken = "Shuriken",
+            NpcRobloxianMascot = "Robloxian Mascot",
+            PaperPlane = "Paper Plane",
+            PetSnowman = "Snowman",
+            PetTurkeyLeg = "Turkey Leg",
+            PlayhouseGingerbread = "Gingerbread House",
+            PresentBig = "Big Present",
+            PresentSmall = "Small Present",
+            SantaSleigh = "Santa's Sleigh",
+            SoundWaveMaker = "Sound Wave Maker",
+            SprayCanWD = "Spray Can",
+            ToolCleaver = "Cleaver",
+            ToolDiggingForkRusty = "Rusty Fork",
+            ToolPencil = "Pencil",
+            ToolPickaxe = "Pickaxe",
+            TractorGreen = "Tractor (Green)",
+            TractorOrange = "Tractor (Orange)",
+            TractorRed = "Tractor (Red)",
+            YouDecoy = "Decoy",
+            YouLittle = "Mini Me",
+            AnvilGray = "Anvil",
+            BallBasketball = "Basketball",
+            BellBig = "Big Bell",
+            BellSmall = "Small Bell",
+            BookNormal = "Book",
+            BookManyPages = "Big Book",
+            BoxCrateWood = "Wooden Crate",
+            DiceBig = "Big Dice",
+            DiceSmall = "Small Dice",
+            DrawerLightBrown = "Drawer",
+            FlagUnitedStatesOfAmerica = "USA Flag",
+            FoodPlate = "Plate",
+            GlassBoxGray = "Glass Box",
+            HayBale = "Hay Bale",
+            MineralDiamond = "Diamond",
+            MineralCrystalPink = "Pink Crystal",
+            MineralIngotGold = "Gold Ingot",
+            PoopPile = "Poop",
+            PoopPileSparkle = "Sparkle Poop",
+            RollerGrayPurple = "Roller",
+            Snowflake = "Snowflake",
+            TeapotUtah = "Teapot",
+            TetracubeI = "Tetracube I",
+            TetracubeJ = "Tetracube J",
+            TetracubeL = "Tetracube L",
+            TetracubeO = "Tetracube O",
+            TetracubeS = "Tetracube S",
+            TetracubeT = "Tetracube T",
+            TetracubeZ = "Tetracube Z",
+            ToyAnimalBear = "Bear",
+            ToyAnimalDuck = "Duck",
+            ToyAnimalFrog = "Frog",
+            ToyAnimalTiger = "Tiger",
+            ToyAnimalUnicorn = "Unicorn",
+            YouFigurine = "Figurine",
+            BallMagicLight = "Magic Light Ball",
+            LightLampDeskLampBent = "Desk Lamp",
+            SpotlightBlue = "Spotlight (Blue)",
+            SpotlightCyan = "Spotlight (Cyan)",
+            SpotlightCyanBlue = "Spotlight (Cyan/Blue)",
+            SpotlightCyanGreen = "Spotlight (Cyan/Green)",
+            SpotlightGreen = "Spotlight (Green)",
+            SpotlightMagenta = "Spotlight (Magenta)",
+            SpotlightRed = "Spotlight (Red)",
+            SpotlightWhite = "Spotlight (White)",
+            SpotlightYellow = "Spotlight (Yellow)",
+            SpotlightYellowGreen = "Spotlight (Yellow/Green)",
+            SpotlightYellowRed = "Spotlight (Yellow/Red)",
+            SpookyCandle1 = "Candle (x1)",
+            SpookyCandle3 = "Candle (x3)",
+            SpookyCandle5 = "Candle (x5)",
+            CupMugBrown = "Mug (Brown)",
+            CupMugWhite = "Mug (White)",
+            FoodBanana = "Banana",
+            FoodBread = "Bread",
+            FoodBroccoli = "Broccoli",
+            FoodCakePink = "Pink Cake",
+            FoodCoconut = "Coconut",
+            FoodDippyEgg = "Dippy Egg",
+            FoodDonut = "Donut",
+            FoodFrenchFries = "French Fries",
+            FoodHamburger = "Burger",
+            FoodHotdog = "Hotdog",
+            FoodMayonnaise = "Mayo",
+            FoodMeatStick = "Meat Stick",
+            FoodMushroomPoison = "Poison Mushroom",
+            FoodPizzaCheese = "Cheese Pizza",
+            FoodPizzaPepperoni = "Pepperoni Pizza",
+        }
+
+        local LiquidGlassToyAliases = {
+            BombMissile = "rocket nuke",
+            BombDarkMatter = "black hole dm void",
+            BombBalloon = "water balloon",
+            FireworkMissile = "rocket",
+            FireworkSmokeBomb = "smoke grenade",
+            CreatureBlobman = "blob crab",
+            CreatureRobot = "bot android",
+            PalletLightBrown = "plank wood board",
+            NinjaKatana = "sword blade",
+            NinjaKunai = "knife dagger",
+            NinjaShuriken = "ninja star throwing star",
+            ToolCleaver = "knife axe",
+            ToolPickaxe = "pick mine",
+            ToolDiggingForkRusty = "pitchfork",
+            ToolPencil = "pen draw",
+            YouDecoy = "clone dummy fake",
+            YouLittle = "tiny small clone",
+            YouFigurine = "statue",
+            FlyingToyUfo = "alien saucer",
+            FlyingToyPlane = "airplane jet",
+            FlyingToyHelicopter = "heli chopper",
+            FloatingIsland = "island sky",
+            PaperPlane = "airplane",
+            TelevisionFlatscreen = "tv monitor screen",
+            TelevisionGray = "tv crt",
+            ComputerLaptopOld = "computer pc",
+            FridgeBlack = "refrigerator freezer",
+            MachineWasher = "washer laundry",
+            OvenMicrowaveWhite = "micro",
+            ClockAlarm = "clock",
+            LightLampGray = "light",
+            LightLampDeskLampBent = "light",
+            BallMagicLight = "orb",
+            DiscoColorBall = "party",
+            SprayCanWD = "wd40 graffiti",
+            BucketPaint = "paint",
+            FoodHotSauce = "spicy",
+            FoodMayonnaise = "mayonnaise",
+            FoodHamburger = "hamburger",
+            FoodMushroomPoison = "toadstool",
+            PoopPile = "shit crap",
+            PoopPileSparkle = "shit crap",
+            MineralIngotGold = "bar",
+            BoxCrateWood = "box",
+            GlassBoxGray = "box cube",
+            DiceBig = "die",
+            DiceSmall = "die",
+            TeapotUtah = "kettle",
+            AnvilGray = "heavy",
+            SantaSleigh = "sled christmas",
+            PetSnowman = "frosty",
+            PlayhouseGingerbread = "christmas",
+            PlantPottedTreeChristmas = "xmas",
+            RedGateGong = "bell",
+            NpcRobloxianMascot = "noob",
+            MidiMaker = "music",
+            SoundWaveMaker = "music",
+            Airhorn = "horn loud",
+            Boombox = "radio music speaker",
+            JukeboxBlue = "music",
+            JukeboxOrange = "music",
+        }
+
+        local LiquidGlassToyTags = {
+            { "Couch", "sofa seat" },
+            { "ArmChair", "chair seat sofa" },
+            { "Spotlight", "light lamp" },
+            { "Oven", "stove cook kitchen" },
+            { "Counter", "kitchen" },
+            { "Toilet", "wc loo bathroom" },
+            { "Bathroom", "bathroom" },
+            { "Instrument", "instrument music" },
+            { "Food", "food eat" },
+            { "Cup", "drink coffee" },
+            { "Tetracube", "tetris block" },
+            { "Spooky", "halloween" },
+            { "Japanese", "japan asian" },
+            { "Factory", "industrial" },
+            { "Childrens", "child kid" },
+            { "ToyAnimal", "animal plush" },
+            { "Mineral", "gem ore" },
+            { "Tractor", "farm vehicle" },
+            { "Present", "gift christmas" },
+            { "Bomb", "explosive boom" },
+            { "Firework", "explosive boom" },
+            { "Table", "table" },
+            { "Bed", "sleep" },
+            { "Plant", "plant" },
+            { "Ball", "ball" },
+            { "Bell", "ring" },
+        }
+
+        local LiquidGlassSearchCache = {}
+        local LiquidGlassSearch = {
+            Query = "",
+            FavOnly = false,
+            Cells = nil,
+            Token = 0,
+            Entries = setmetatable({}, { __mode = "k" }),
+            Hooked = setmetatable({}, { __mode = "k" }),
+            FavButtons = {},
+        }
+        local liquidGlassScheduleSearch
+
+        local function liquidGlassKnownToy(name)
+            return LiquidGlassToyNames[name] ~= nil or (SPAWNABLE_TOYS and SPAWNABLE_TOYS[name] ~= nil)
+        end
+
+        local function liquidGlassToyHaystack(key)
+            local cached = LiquidGlassSearchCache[key]
+            if cached then return cached end
+            local spaced = string.gsub(key, "(%l)(%u)", "%1 %2")
+            local parts = { key, spaced, LiquidGlassToyNames[key] or "", LiquidGlassToyAliases[key] or "" }
+            for _, tag in ipairs(LiquidGlassToyTags) do
+                if string.sub(key, 1, #tag[1]) == tag[1] then
+                    parts[#parts + 1] = tag[2]
+                end
+            end
+            local haystack = string.lower(table.concat(parts, " "))
+            LiquidGlassSearchCache[key] = haystack
+            return haystack
+        end
+
+        local function liquidGlassIsFavorite(cell)
+            local star = cell:FindFirstChild("Favorite")
+            return star ~= nil and star:IsA("GuiObject") and star.Visible
+        end
+
+        local function liquidGlassApplyEntry(entry)
+            local show = entry.want and entry.match
+            entry.applied = show
+            if entry.cell.Visible ~= show then
+                entry.cell.Visible = show
+                return true
+            end
+            return false
+        end
+
+        local function liquidGlassToyCells(menu)
+            if LiquidGlassSearch.Cells then return LiquidGlassSearch.Cells end
+            local cells = {}
+            local tabContents = menu:FindFirstChild("TabContents")
+            if not tabContents then return cells end
+            for _, tab in ipairs(tabContents:GetChildren()) do
+                for _, grid in ipairs(tab:GetChildren()) do
+                    if grid:IsA("ScrollingFrame") then
+                        local isToyGrid = false
+                        for _, child in ipairs(grid:GetChildren()) do
+                            if liquidGlassKnownToy(child.Name) then
+                                isToyGrid = true
+                                break
+                            end
+                        end
+                        if isToyGrid then
+                            for _, cell in ipairs(grid:GetChildren()) do
+                                if cell:IsA("GuiObject") then
+                                    local entry = LiquidGlassSearch.Entries[cell]
+                                    if not entry then
+                                        entry = { cell = cell, grid = grid, hay = liquidGlassToyHaystack(cell.Name), want = cell.Visible, match = true }
+                                        entry.applied = entry.want
+                                        LiquidGlassSearch.Entries[cell] = entry
+                                        liquidGlassConnect(cell:GetPropertyChangedSignal("Visible"), function()
+                                            if not LiquidGlassState.Active or cell.Visible == entry.applied then return end
+                                            entry.want = cell.Visible
+                                            liquidGlassApplyEntry(entry)
+                                        end)
+                                        local star = cell:FindFirstChild("Favorite")
+                                        if star and star:IsA("GuiObject") then
+                                            liquidGlassConnect(star:GetPropertyChangedSignal("Visible"), function()
+                                                if LiquidGlassState.Active and LiquidGlassSearch.FavOnly then
+                                                    liquidGlassScheduleSearch(menu, 0)
+                                                end
+                                            end)
+                                        end
+                                    end
+                                    cells[#cells + 1] = entry
+                                end
+                            end
+                            if not LiquidGlassSearch.Hooked[grid] then
+                                LiquidGlassSearch.Hooked[grid] = true
+                                liquidGlassConnect(grid.ChildAdded, function()
+                                    LiquidGlassSearch.Cells = nil
+                                    if LiquidGlassSearch.Query ~= "" or LiquidGlassSearch.FavOnly then
+                                        liquidGlassScheduleSearch(menu, 0.1)
+                                    end
+                                end)
+                                liquidGlassConnect(grid.ChildRemoved, function()
+                                    LiquidGlassSearch.Cells = nil
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+            LiquidGlassSearch.Cells = cells
+            return cells
+        end
+
+        local function liquidGlassRunSearch(menu)
+            local words = {}
+            for word in string.gmatch(string.lower(LiquidGlassSearch.Query), "[^%s%p]+") do
+                words[#words + 1] = word
+            end
+            local favOnly = LiquidGlassSearch.FavOnly
+            local changedGrids = {}
+            for _, entry in ipairs(liquidGlassToyCells(menu)) do
+                if entry.cell.Parent then
+                    local match = not favOnly or liquidGlassIsFavorite(entry.cell)
+                    if match then
+                        for _, word in ipairs(words) do
+                            if not string.find(entry.hay, word, 1, true) then
+                                match = false
+                                break
+                            end
+                        end
+                    end
+                    entry.match = match
+                    if liquidGlassApplyEntry(entry) then
+                        changedGrids[entry.grid] = true
+                    end
+                end
+            end
+            for grid in pairs(changedGrids) do
+                pcall(function() grid.CanvasPosition = Vector2.zero end)
+            end
+        end
+
+        liquidGlassScheduleSearch = function(menu, delay)
+            LiquidGlassSearch.Token += 1
+            local token = LiquidGlassSearch.Token
+            task.delay(delay, function()
+                if token == LiquidGlassSearch.Token and LiquidGlassState.Active then
+                    liquidGlassRunSearch(menu)
+                end
+            end)
+        end
+
+        local function liquidGlassResetSearch()
+            LiquidGlassSearch.Token += 1
+            LiquidGlassSearch.Query = ""
+            LiquidGlassSearch.FavOnly = false
+            for cell, entry in pairs(LiquidGlassSearch.Entries) do
+                pcall(function() cell.Visible = entry.want end)
+            end
+            LiquidGlassSearch.Entries = setmetatable({}, { __mode = "k" })
+            LiquidGlassSearch.Hooked = setmetatable({}, { __mode = "k" })
+            LiquidGlassSearch.FavButtons = {}
+            LiquidGlassSearch.Cells = nil
+        end
+
+        local function liquidGlassFireButton(button)
+            local fired = false
+            pcall(function()
+                if typeof(getconnections) == "function" then
+                    for _, signal in ipairs({ button.Activated, button.MouseButton1Click }) do
+                        for _, conn in ipairs(getconnections(signal)) do
+                            pcall(function()
+                                if conn.Fire then conn:Fire() else conn:fire() end
+                            end)
+                            fired = true
+                        end
+                    end
+                end
+            end)
+            if not fired then
+                pcall(function()
+                    if firesignal then firesignal(button.Activated) end
+                end)
+            end
+        end
+
+        local function liquidGlassSetFavorites(menu, enabled)
+            LiquidGlassSearch.FavOnly = enabled
+            for _, info in ipairs(LiquidGlassSearch.FavButtons) do
+                if info.button.Parent then
+                    info.button.ImageColor3 = enabled and info.selectedColor or Color3.new(1, 1, 1)
+                end
+            end
+            liquidGlassScheduleSearch(menu, 0)
+        end
+
+        local function liquidGlassCreateFavoritesTabs(menu)
+            local tabContents = menu:FindFirstChild("TabContents")
+            if not tabContents then return end
+            for _, tab in ipairs(tabContents:GetChildren()) do
+                local sorting = tab:FindFirstChild("SortingTabs")
+                local template = sorting and sorting:FindFirstChild("Toys")
+                local allButton = sorting and sorting:FindFirstChild("All")
+                if template and allButton and template:IsA("ImageButton") and allButton:IsA("GuiButton")
+                    and not sorting:FindFirstChild("ResoLiquidGlassFavTab") then
+                    local button = liquidGlassOwn(template:Clone())
+                    button.Name = "ResoLiquidGlassFavTab"
+                    button.Image = "rbxassetid://10045503805"
+                    button.ImageColor3 = Color3.new(1, 1, 1)
+                    button.LayoutOrder = template.LayoutOrder + 1
+                    button.Parent = sorting
+                    local info = { button = button, selectedColor = Color3.new(0, 1, 0.5) }
+                    table.insert(LiquidGlassSearch.FavButtons, info)
+
+                    liquidGlassConnect(button.Activated, function()
+                        if not LiquidGlassState.Active then return end
+                        if LiquidGlassSearch.FavOnly then
+                            liquidGlassSetFavorites(menu, false)
+                            liquidGlassFireButton(allButton)
+                            return
+                        end
+                        liquidGlassFireButton(allButton)
+                        task.defer(function()
+                            if not LiquidGlassState.Active then return end
+                            if allButton.ImageColor3 ~= Color3.new(1, 1, 1) then
+                                info.selectedColor = allButton.ImageColor3
+                            end
+                            for _, other in ipairs(sorting:GetChildren()) do
+                                if other:IsA("ImageButton") and other ~= button then
+                                    other.ImageColor3 = Color3.new(1, 1, 1)
+                                end
+                            end
+                            liquidGlassSetFavorites(menu, true)
+                        end)
+                    end)
+                    for _, other in ipairs(sorting:GetChildren()) do
+                        if other:IsA("GuiButton") and other ~= button then
+                            liquidGlassConnect(other.Activated, function()
+                                if LiquidGlassState.Active and LiquidGlassSearch.FavOnly then
+                                    liquidGlassSetFavorites(menu, false)
+                                end
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+
+        local function liquidGlassCreateSearch(menu)
+            local tabContents = menu:FindFirstChild("TabContents")
+            if not tabContents then return end
+            LiquidGlassSearch.Query = ""
+            liquidGlassCreateFavoritesTabs(menu)
+
+            local box = liquidGlassCreate("TextBox", "ResoLiquidGlassSearch", menu)
+            box.AnchorPoint = Vector2.new(0, 0.5)
+            box.Size = UDim2.fromOffset(252, 36)
+            box.BackgroundColor3 = Color3.new(1, 1, 1)
+            box.BackgroundTransparency = 1
+            box.ClearTextOnFocus = false
+            box.Text = ""
+            box.PlaceholderText = "SEARCH"
+            box.PlaceholderColor3 = Color3.fromRGB(215, 215, 225)
+            box.TextColor3 = Color3.new(1, 1, 1)
+            box.TextSize = 14
+            box.Font = Enum.Font.GothamBold
+            box.TextXAlignment = Enum.TextXAlignment.Center
+            box.TextTruncate = Enum.TextTruncate.AtEnd
+            box.Visible = false
+            box.ZIndex = 10000
+
+            local padding = liquidGlassCreate("UIPadding", "ResoLiquidGlassSearchPadding", box)
+            padding.PaddingLeft = UDim.new(0, 32)
+            padding.PaddingRight = UDim.new(0, 32)
+            local corner = liquidGlassCreate("UICorner", "ResoLiquidGlassSearchCorner", box)
+            corner.CornerRadius = UDim.new(0, 12)
+            local stroke = liquidGlassCreate("UIStroke", "ResoLiquidGlassSearchStroke", box)
+            stroke.Thickness = 2
+            stroke.Color = Color3.new(1, 1, 1)
+            stroke.Transparency = 0.4
+            stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+            local clear = liquidGlassCreate("TextButton", "ResoLiquidGlassSearchClear", box)
+            clear.AnchorPoint = Vector2.new(0, 0.5)
+            clear.Position = UDim2.new(1, 4, 0.5, 0)
+            clear.Size = UDim2.fromOffset(24, 24)
+            clear.BackgroundTransparency = 1
+            clear.Text = "×"
+            clear.TextColor3 = Color3.new(1, 1, 1)
+            clear.TextSize = 20
+            clear.Font = Enum.Font.GothamBold
+            clear.AutoButtonColor = false
+            clear.Visible = false
+            clear.ZIndex = 10001
+
+            local function place()
+                if not LiquidGlassState.Active or not box.Parent then return end
+                local sorting
+                for _, tab in ipairs(tabContents:GetChildren()) do
+                    if tab:IsA("GuiObject") and tab.Visible then
+                        local candidate = tab:FindFirstChild("SortingTabs")
+                        if candidate and candidate:IsA("GuiObject") and candidate.Visible then
+                            sorting = candidate
+                            break
+                        end
+                    end
+                end
+                if not sorting then
+                    box.Visible = false
+                    return
+                end
+                local firstButton = math.huge
+                for _, button in ipairs(sorting:GetChildren()) do
+                    if button:IsA("GuiButton") and button.Visible then
+                        firstButton = math.min(firstButton, button.AbsolutePosition.X)
+                    end
+                end
+                local rejoin = menu:FindFirstChild("ResoLiquidGlassRejoinContainer")
+                local clearBar = menu:FindFirstChild("ResoLiquidGlassControlBar")
+                local clearButton = clearBar and clearBar:FindFirstChild("ResoLiquidGlassClearButton")
+                local height = 36
+                local left = sorting.AbsolutePosition.X + 12
+                local right = left + 220
+                local centerY = sorting.AbsolutePosition.Y + sorting.AbsoluteSize.Y / 2
+                if rejoin then
+                    local rowLeft = rejoin.AbsolutePosition.X
+                    local rowRight = clearButton and (clearButton.AbsolutePosition.X + clearButton.AbsoluteSize.X) or (rowLeft + 252)
+                    local gapTop = rejoin.AbsolutePosition.Y + rejoin.AbsoluteSize.Y
+                    local gapBottom = math.huge
+                    local tabBar = menu:FindFirstChild("TabBar")
+                    if tabBar then
+                        for _, tabButton in ipairs(tabBar:GetDescendants()) do
+                            if tabButton:IsA("GuiButton") and tabButton.Visible and tabButton.AbsoluteSize.Y > 0 then
+                                gapBottom = math.min(gapBottom, tabButton.AbsolutePosition.Y)
+                            end
+                        end
+                    end
+                    gapBottom = math.min(gapBottom, gapTop + 12 + height + 12)
+                    if gapBottom - gapTop >= height + 8 then
+                        left, right = rowLeft, rowRight
+                        centerY = (gapTop + gapBottom) / 2
+                    end
+                end
+                if firstButton ~= math.huge and centerY + height / 2 > sorting.AbsolutePosition.Y then
+                    right = math.min(right, firstButton - 14)
+                end
+                local base = menu.AbsolutePosition
+                box.Position = UDim2.fromOffset(left - base.X, centerY - base.Y)
+                box.Size = UDim2.fromOffset(math.max(right - left, 90), height)
+                box.Visible = true
+            end
+
+            for _, tab in ipairs(tabContents:GetChildren()) do
+                if tab:IsA("GuiObject") then
+                    liquidGlassConnect(tab:GetPropertyChangedSignal("Visible"), function() task.defer(place) end)
+                    local sorting = tab:FindFirstChild("SortingTabs")
+                    if sorting then
+                        liquidGlassConnect(sorting.ChildAdded, function() task.defer(place) end)
+                    end
+                end
+            end
+            liquidGlassConnect(menu:GetPropertyChangedSignal("AbsoluteSize"), function() task.defer(place) end)
+            liquidGlassConnect(menu:GetPropertyChangedSignal("AbsolutePosition"), function() task.defer(place) end)
+            task.defer(place)
+            task.delay(0.2, place)
+
+            liquidGlassConnect(box.Focused, function()
+                liquidGlassTween(stroke, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), { Transparency = 0 })
+                liquidGlassTween(box, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), { BackgroundTransparency = 0.9 })
+            end)
+            liquidGlassConnect(box.FocusLost, function()
+                liquidGlassTween(stroke, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), { Transparency = 0.4 })
+                liquidGlassTween(box, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), { BackgroundTransparency = 1 })
+            end)
+            liquidGlassConnect(box:GetPropertyChangedSignal("Text"), function()
+                if not LiquidGlassState.Active then return end
+                LiquidGlassSearch.Query = box.Text
+                clear.Visible = box.Text ~= ""
+                liquidGlassScheduleSearch(menu, 0.08)
+            end)
+            liquidGlassConnect(clear.MouseButton1Click, function()
+                box.Text = ""
+            end)
+        end
         local function liquidGlassCleanup()
             LiquidGlassState.Active = false
             LiquidGlassState.RejoinPending = false
+            liquidGlassResetSearch()
 
             for _, connection in ipairs(LiquidGlassState.Connections) do
                 pcall(function() connection:Disconnect() end)
@@ -55661,7 +56755,6 @@ local function liquidGlassCreateRejoin(menu)
                 LiquidGlassState.Tweens[instance] = nil
             end
 
-            -- Restore every property that was changed on pre-existing game UI.
             for instance, snapshot in pairs(LiquidGlassState.Originals) do
                 if instance and snapshot then
                     for property, value in pairs(snapshot.Values) do
@@ -55671,13 +56764,11 @@ local function liquidGlassCreateRejoin(menu)
             end
             table.clear(LiquidGlassState.Originals)
 
-            -- Cancel in-flight ripple effects first, then remove them.
             for instance in pairs(LiquidGlassState.MeltEffects) do
                 pcall(function() instance:Destroy() end)
                 LiquidGlassState.MeltEffects[instance] = nil
             end
 
-            -- Created UI, blur, strokes, corners, and scales are all owned by this feature.
             for index = #LiquidGlassState.Created, 1, -1 do
                 local instance = LiquidGlassState.Created[index]
                 pcall(function()
@@ -55711,7 +56802,6 @@ local function liquidGlassCreateRejoin(menu)
             LiquidGlassState.Menu = menu
             LiquidGlassState.MenuGui = menuGui
 
-            -- Capture and update the menu's layout; visibility remains controlled by the game.
             liquidGlassSet(menu, "Size", LiquidGlassConfig.TargetSize)
             liquidGlassSet(menu, "AnchorPoint", Vector2.new(0.5, 0.5))
             liquidGlassSet(menu, "Position", UDim2.fromScale(0.5, 0.5))
@@ -55719,7 +56809,6 @@ local function liquidGlassCreateRejoin(menu)
             liquidGlassSet(menu, "BackgroundColor3", LiquidGlassConfig.GlassColor)
             liquidGlassSet(menuGui, "DisplayOrder", 10000)
 
-            -- The game can rewrite Menu's surface after spawning a toy; keep it at 90% transparent.
             local function enforceGlassSurface()
                 if not LiquidGlassState.Active or not menu.Parent then return end
                 if math.abs(menu.BackgroundTransparency - LiquidGlassConfig.GlassTransparency) > 0.001 then
@@ -55730,13 +56819,11 @@ local function liquidGlassCreateRejoin(menu)
                 end
             end
 
-            -- Style current children before adding our own protected overlay elements.
             for _, descendant in ipairs(menu:GetDescendants()) do
                 liquidGlassStyle(descendant)
             end
             liquidGlassPlaceClearButton(menu)
 
-            -- Replace Savitar's old menu logo with HuiG's embedded logo, same placement.
             pcall(function()
                 local oldSavitarLogo = menu:FindFirstChild("SavitarCustomLogo")
                 if oldSavitarLogo then oldSavitarLogo:Destroy() end
@@ -55755,8 +56842,6 @@ local function liquidGlassCreateRejoin(menu)
             huiGMenuLogo.ScaleType = Enum.ScaleType.Fit
             huiGMenuLogo.ZIndex = 10000
 
-            -- Apply the glass surface directly to Menu. This avoids a negative-ZIndex
-            -- overlay that can cover buttons or fail to render consistently.
             local menuCorner = menu:FindFirstChildOfClass("UICorner")
             if not menuCorner then
                 menuCorner = liquidGlassCreate("UICorner", "ResoLiquidGlassCorner", menu)
@@ -55775,6 +56860,7 @@ local function liquidGlassCreateRejoin(menu)
             liquidGlassSet(menuStroke, "Enabled", true)
 
             liquidGlassCreateRejoin(menu)
+            liquidGlassCreateSearch(menu)
 
             local blur = liquidGlassCreate("BlurEffect", "Reso_LiquidGlass_Blur", Lighting)
             blur.Size = 0
@@ -55802,10 +56888,6 @@ local function liquidGlassCreateRejoin(menu)
             return true
         end
 
-        ----------------------------------------------------------------------
-        -- CoinBoxDesign copied from Savitar; only the coin image uses HuiG's embedded logo.
-        -- Enabled automatically on startup; no toggle.
-        ----------------------------------------------------------------------
 do
 	local tbl34 = {}
 	local flag42 = false
@@ -55937,13 +57019,9 @@ do
 		end)
 	end
 
-	-- Hook cleanup so Peak Visuals / script unload reverts the coin design.
 	HuiGCoinBoxCleanup = _removeCoin
 end
 
-	----------------------------------------------------------------------
-	-- Coin amount count-up + floating +N + sound (only when coins increase)
-	----------------------------------------------------------------------
 	do
 		local TweenService = game:GetService("TweenService")
 		local SoundService = game:GetService("SoundService")
@@ -55982,7 +57060,6 @@ end
 			end)
 		end
 
-		-- floating "+50" to the LEFT of CoinsFrame, rises and fades
 		local function spawnGainPopup(delta)
 			pcall(function()
 				local frame = coinsFrameRef
@@ -56003,7 +57080,6 @@ end
 				popup.ZIndex = 200
 				popup.AnchorPoint = Vector2.new(1, 0.5)
 				popup.Size = UDim2.fromOffset(140, 40)
-				-- LEFT of CoinsFrame: right edge of popup sits just outside the left edge of the frame
 				popup.Position = UDim2.new(0, -12, 0.5, 0)
 				popup.Visible = true
 				popup.Parent = frame
@@ -56017,7 +57093,6 @@ end
 						return
 					end
 					local a = math.clamp((os.clock() - startClock) / dur, 0, 1)
-					-- float upward (negative Y) while staying on the left
 					popup.Position = UDim2.new(0, -12, 0.5, -56 * a)
 					popup.TextTransparency = a
 					popup.TextStrokeTransparency = 0.25 + 0.75 * a
@@ -56149,13 +57224,211 @@ end
             end,
         })
 
+        do
+            local CapeBox = Peak:AddRightGroupbox("<b>Cape</b>", "shirt")
+            local capeHideFirstPerson = true
+            local function capeStop()
+                local stop = getgenv().HuiGCapeStop
+                if stop then pcall(stop) end
+            end
+            local function capeStart()
+                capeStop()
+                local W, H, ROWS, D, RIM = 2, 3.2, 8, 0.08, 0.06
+                local rowH = H / ROWS
+                local RIM_COLOR = Color3.fromRGB(185, 185, 195)
+                local folder = Instance.new("Folder")
+                folder.Name = "HuiGCape"
+                local function capePart(size, color, mat)
+                    local p = Instance.new("Part")
+                    p.Size, p.Color, p.Material = size, color, mat
+                    p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, false
+                    p.Parent = folder
+                    return p
+                end
 
-		-- Savitar F-22 jet: controls + flight runtime ported into Peak Visuals.
+                local rows, rimL, rimR, shines = {}, {}, {}, {}
+                local CLOTH = ColorSequence.new(Color3.fromRGB(28, 28, 34), Color3.fromRGB(11, 11, 15))
+                local function rowSheet(part, face, i)
+                    local gui = Instance.new("SurfaceGui")
+                    gui.Face, gui.SizingMode, gui.PixelsPerStud, gui.LightInfluence = face, Enum.SurfaceGuiSizingMode.PixelsPerStud, 100, 0
+                    gui.Parent = part
+                    local clip = Instance.new("Frame")
+                    clip.Size, clip.BackgroundTransparency, clip.ClipsDescendants = UDim2.fromScale(1, 1), 1, true
+                    clip.Parent = gui
+                    local sheet = Instance.new("Frame")
+                    sheet.Size, sheet.Position = UDim2.fromOffset(W * 100, H * 100), UDim2.fromOffset(0, 1.5 - (i - 1) * rowH * 100)
+                    sheet.BackgroundColor3, sheet.BorderSizePixel = Color3.new(1, 1, 1), 0
+                    sheet.Parent = clip
+                    local grad = Instance.new("UIGradient")
+                    grad.Color, grad.Rotation = CLOTH, 90
+                    grad.Parent = sheet
+                    return sheet
+                end
+                for i = 1, ROWS do
+                    rows[i] = capePart(Vector3.new(W, rowH + 0.03, D), Color3.fromRGB(16, 16, 20), Enum.Material.SmoothPlastic)
+                    rimL[i] = capePart(Vector3.new(RIM, rowH + 0.03, D), RIM_COLOR, Enum.Material.Neon)
+                    rimR[i] = capePart(Vector3.new(RIM, rowH + 0.03, D), RIM_COLOR, Enum.Material.Neon)
+                    rowSheet(rows[i], Enum.NormalId.Front, i)
+                    local sheet = rowSheet(rows[i], Enum.NormalId.Back, i)
+                    for z = 1, 2 do
+                        local img = Instance.new("ImageLabel")
+                        img.BackgroundTransparency, img.Image, img.ScaleType, img.ZIndex = 1, huiGLogoAsset or "", Enum.ScaleType.Fit, z
+                        img.AnchorPoint, img.Position, img.Size = Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.42), UDim2.fromScale(0.82, 0.82)
+                        img.Parent = sheet
+                        if z == 2 then
+                            local grad = Instance.new("UIGradient")
+                            grad.Rotation = 25
+                            grad.Transparency = NumberSequence.new({
+                                NumberSequenceKeypoint.new(0, 1),
+                                NumberSequenceKeypoint.new(0.4, 1),
+                                NumberSequenceKeypoint.new(0.5, 0.35),
+                                NumberSequenceKeypoint.new(0.6, 1),
+                                NumberSequenceKeypoint.new(1, 1),
+                            })
+                            grad.Offset = Vector2.new(-2, 0)
+                            grad.Parent = img
+                            shines[i] = grad
+                        end
+                    end
+                end
+                local rimTop = capePart(Vector3.new(W + RIM * 2, RIM, D), RIM_COLOR, Enum.Material.Neon)
+                local rimBottom = capePart(Vector3.new(W + RIM * 2, RIM, D), RIM_COLOR, Enum.Material.Neon)
+                local parts = {}
+                for i = 1, ROWS do
+                    parts[#parts + 1] = rows[i]
+                    parts[#parts + 1] = rimL[i]
+                    parts[#parts + 1] = rimR[i]
+                end
+                parts[#parts + 1] = rimTop
+                parts[#parts + 1] = rimBottom
+
+                local COMET = { { gap = 0, thick = 0.13, len = 0.32 } }
+                for k = 1, 5 do
+                    COMET[#COMET + 1] = { gap = 0.1 + k * 0.17, thick = 0.13 - k * 0.016, len = 0.18 }
+                end
+                local beads = {}
+                for c = 0, 1 do
+                    for k, spec in ipairs(COMET) do
+                        local bead = capePart(Vector3.new(spec.thick, spec.thick, spec.len), Color3.new(1, 1, 1), Enum.Material.Neon)
+                        if k == 1 then
+                            local light = Instance.new("PointLight")
+                            light.Color, light.Brightness, light.Range = Color3.new(1, 1, 1), 1.6, 3
+                            light.Parent = bead
+                        end
+                        beads[#beads + 1] = { part = bead, offset = c * 0.5, gap = spec.gap }
+                        parts[#parts + 1] = bead
+                    end
+                end
+                folder.Parent = workspace
+
+                local rowCFs, path, lens = {}, {}, {}
+                local function pathPoint(dist, total)
+                    dist %= total
+                    for j = 1, #path - 1 do
+                        if dist <= lens[j + 1] then
+                            local a, b = path[j], path[j + 1]
+                            local seg = lens[j + 1] - lens[j]
+                            local pos = a.p:Lerp(b.p, seg > 0 and (dist - lens[j]) / seg or 0)
+                            return CFrame.lookAt(pos, pos + (b.p - a.p), a.n)
+                        end
+                    end
+                    return CFrame.new(path[1].p)
+                end
+
+                local rowAngle = table.create(ROWS, 6)
+                local phase, clock = 0, 0
+                local cfs = table.create(#parts)
+                local conn = RunService.RenderStepped:Connect(function(dt)
+                    local char = LocalPlayer.Character
+                    local torso = char and (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"))
+                    local root = char and char:FindFirstChild("HumanoidRootPart")
+                    local head = char and char:FindFirstChild("Head")
+                    local cam = workspace.CurrentCamera
+                    local firstPerson = capeHideFirstPerson and head and cam
+                        and (head.LocalTransparencyModifier > 0.5 or (cam.CFrame.Position - head.Position).Magnitude < 1.5)
+                    local show = torso ~= nil and root ~= nil and not firstPerson
+                    folder.Parent = show and workspace or nil
+                    if not show then return end
+                    clock += dt
+
+                    local vel = root.AssemblyLinearVelocity
+                    local speed = Vector3.new(vel.X, 0, vel.Z).Magnitude
+                    phase += dt * (2 + speed * 0.6)
+                    local base = 5 + math.min(speed * 2.6, 50) + math.clamp(-vel.Y * 1.5, 0, 25)
+                    local trail = math.min(speed * 1.1, 18)
+                    local amp = 1.2 + math.min(speed, 16) * 0.35
+
+                    local hinge = torso.CFrame * CFrame.new(0, torso.Size.Y / 2 - 0.05, torso.Size.Z / 2 + D / 2 + 0.03)
+                    local spin = hinge.Rotation
+                    local top = hinge.Position
+                    local n = 0
+                    for i = 1, ROWS do
+                        local t = (i - 1) / (ROWS - 1)
+                        local target = base + t * trail + math.sin(phase - i * 0.7) * amp * t
+                        rowAngle[i] += (target - rowAngle[i]) * math.min(dt * (14 - i), 1)
+                        local rowCF = CFrame.new(top) * spin * CFrame.Angles(-math.rad(math.max(rowAngle[i], 1)), 0, 0)
+                        local mid = rowCF * CFrame.new(0, -rowH / 2, 0)
+                        cfs[n + 1] = mid
+                        cfs[n + 2] = mid * CFrame.new(-(W + RIM) / 2, 0, 0)
+                        cfs[n + 3] = mid * CFrame.new((W + RIM) / 2, 0, 0)
+                        n += 3
+                        rowCFs[i] = rowCF
+                        if i == 1 then cfs[ROWS * 3 + 1] = rowCF * CFrame.new(0, RIM / 2, 0) end
+                        if i == ROWS then cfs[ROWS * 3 + 2] = rowCF * CFrame.new(0, -rowH - RIM / 2, 0) end
+                        top = (rowCF * CFrame.new(0, -rowH, 0)).Position
+                    end
+                    local xr, last = (W + RIM) / 2, rowCFs[ROWS]
+                    table.clear(path)
+                    local function add(cf, x, y)
+                        path[#path + 1] = { p = (cf * CFrame.new(x, y, 0)).Position, n = cf.LookVector }
+                    end
+                    add(rowCFs[1], -xr, RIM / 2)
+                    add(rowCFs[1], xr, RIM / 2)
+                    for i = 2, ROWS do add(rowCFs[i], xr, 0) end
+                    add(last, xr, -rowH - RIM / 2)
+                    add(last, -xr, -rowH - RIM / 2)
+                    for i = ROWS, 2, -1 do add(rowCFs[i], -xr, 0) end
+                    add(rowCFs[1], -xr, RIM / 2)
+                    lens[1] = 0
+                    for j = 2, #path do lens[j] = lens[j - 1] + (path[j].p - path[j - 1].p).Magnitude end
+                    local total = lens[#path]
+                    local head = clock * 3.6
+                    for k, b in ipairs(beads) do
+                        cfs[n + 2 + k] = pathPoint(head + b.offset * total - b.gap, total)
+                    end
+                    workspace:BulkMoveTo(parts, cfs, Enum.BulkMoveMode.FireCFrameChanged)
+
+                    local sweep = Vector2.new(-1.2 + ((clock % 4) / 1.4) * 2.4, 0)
+                    for _, g in ipairs(shines) do g.Offset = sweep end
+                end)
+                getgenv().HuiGCapeStop = function()
+                    conn:Disconnect()
+                    folder:Destroy()
+                    getgenv().HuiGCapeStop = nil
+                end
+            end
+            CapeBox:AddToggle("HuiGCape", {
+                Text = "Cape",
+                Default = false,
+                Tooltip = "Cloth cape with your logo and flowing neon rim (only you see it)",
+                Callback = function(enabled)
+                    if enabled then capeStart() else capeStop() end
+                end,
+            })
+            CapeBox:AddToggle("HuiGCapeHideFirstPerson", {
+                Text = "Hide in First Person",
+                Default = true,
+                Callback = function(enabled)
+                    capeHideFirstPerson = enabled
+                end,
+            })
+        end
+
+
 																																														do
 																																															local v75, JetSoundSelect
 
 																																															do
-																																																-- Moved from the Savitar ShaderMap tab into Peak Visuals.
 																																																
 
 																																																_JET = {
@@ -57756,6 +59029,9 @@ end
 
 			tbl12.CleanupPeakVisuals = function()
 				pcall(function()
+					if getgenv().HuiGCapeStop then getgenv().HuiGCapeStop() end
+				end)
+				pcall(function()
 					if _JET and _JET.mounted and doUnmount then doUnmount() end
 				end)
 				pcall(function()
@@ -58072,7 +59348,6 @@ end
 
 		getgenv().ResonanceRunning = false
         pcall(function() workspace.FallenPartsDestroyHeight = getgenv().ResonanceOriginalFallenHeight end)
-		-- final ghost wipe AFTER option resets (dropdown SetValue was recreating it)
 		pcall(function()
 			if tbl12.ClearGhostPreview then tbl12.ClearGhostPreview() end
 		end)
@@ -58171,10 +59446,6 @@ end
 		end)
 	end
 
-	-- ==========================================================
-	-- Reso-native command bar with Savitar's original glass visuals, transitions, and sound cues.
-	-- Reso's main menu remains instant; the standalone command panel retains Savitar's own short animation.
-	-- ==========================================================
 	do
 		local CommandBarState = {
 			Enabled = true,
@@ -58260,8 +59531,6 @@ end
 			return tween
 		end
 
-		-- Savitar command-panel actions, reimplemented against Reso's own state/helpers.
-		-- Only the explicitly listed built-in commands are exposed by the command bar.
 		local BuiltinCommands = {
 			{ Id = "__cmd_bring", Name = "bring", DisplayName = "bring / b", Description = "Bring a player to you", Command = "bring", Aliases = { "bring", "b" }, Usage = "bring <player>", RequiresArgument = true, Handler = "target", TargetMethod = "Bring", Icon = "send-to-back" },
 			{ Id = "__cmd_tp", Name = "tp", DisplayName = "tp / goto", Description = "Teleport to a player or location", Command = "tp", Aliases = { "tp", "goto" }, Usage = "tp <player or location>", RequiresArgument = true, Handler = "teleport", Icon = "galaxy" },
@@ -58285,7 +59554,6 @@ end
 		local specialtiesTabs = tbl15.Settings:AddRightGroupbox("Specialties", "star"):AddTabbox({ PopOut = false })
 		local commandBarTab = specialtiesTabs:AddTab("Command Bar", "terminal")
 		local actionWheelTab = specialtiesTabs:AddTab("Action Wheel", "circle-dot")
-		-- CommandSettings is switched to the Action Wheel tab where its controls start.
 		local CommandSettings = commandBarTab
 		CommandSettings:AddLabel({ Text = "Run only the built-in HuiG Custom commands. For target commands, press Enter to use the top player/location suggestion. Default shortcut: L.", DoesWrap = true })
 		CommandSettings:AddToggle("CommandBarEnabled", {
@@ -58355,7 +59623,6 @@ end
 		})
 
 
-		-- Savitar-style radial Action Wheel, moved into ResoCustom Settings > Command Bar.
 		local actionWheelModuleOrder = {
 			"Flight",
 			"Walkspeed",
@@ -58809,7 +60076,6 @@ end
 			end,
 		})
 
-		-- Create the original circular renderer and its hold/toggle-key input handling.
 		task.spawn(function()
 			local tbl46 = {
 				Tween = game:GetService("TweenService"),
@@ -59429,8 +60695,6 @@ end
 					textButton2.Text = ""
 					textButton2.Parent = frame8
 
-					-- Let Roblox's GUI hit-testing determine hover; the button fills the
-					-- entire module box, including its lower half.
 					textButton2.MouseEnter:Connect(function()
 						if arg.IsOpen then
 							arg:_setHighlight(i)
@@ -59446,7 +60710,6 @@ end
 						if arg.IsOpen then
 							arg._selectedIndex = i
 							if arg.OrderEditMode then
-								-- Stay open; only select so A/D can move this module.
 								arg:_setHighlight(i)
 								return
 							end
@@ -60052,8 +61315,6 @@ end
 				tbl47.DimOverlay.Modal = true
 
 				pcall(function()
-					-- Free cursor for wheel picking only. Do not save/restore MouseBehavior —
-				-- Roblox third-person camera needs LockCenter on RMB and must own that state.
 					tbl46.UIS.MouseBehavior = Enum.MouseBehavior.Default
 					tbl46.UIS.MouseIconEnabled = true
 				end)
@@ -60141,8 +61402,6 @@ end
 						return
 					end
 
-					-- Keep cursor free + visible for slice picking. Avoid re-asserting every
-					-- frame harder than needed so close-restore is not fighting this loop.
 					if tbl46.UIS.MouseBehavior == Enum.MouseBehavior.LockCenter then
 						pcall(function()
 							tbl46.UIS.MouseBehavior = Enum.MouseBehavior.Default
@@ -60192,8 +61451,6 @@ end
 						end
 					end
 
-					-- Hover selection is handled by each ItemBtn's MouseEnter/MouseLeave
-					-- events. Nothing is selected while the pointer is outside a module.
 				end)
 			end
 
@@ -60214,8 +61471,6 @@ end
 						tbl46.UIS.MouseIconEnabled = prevIcon
 					end
 
-					-- Never force Default/LockCenter here — that breaks third-person RMB look.
-					-- Only clear the frozen-at-last-position state when the user is not looking.
 					local rmb = false
 					pcall(function()
 						rmb = tbl46.UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
@@ -60238,7 +61493,6 @@ end
 				local closeToken = arg._activeMouseToken
 				arg.IsOpen = false
 
-				-- Kill the open render loop first so it cannot re-lock/unlock against us.
 				if connection6 then
 					pcall(function()
 						connection6:Disconnect()
@@ -60247,13 +61501,11 @@ end
 				end
 
 				tbl47.DimOverlay.Modal = false
-				-- Disable GUI promptly so it cannot eat camera input after close.
 				if tbl47.ScreenGui then
 					tbl47.ScreenGui.Enabled = false
 				end
 
 				pcall(function()
-					-- Restore exactly what we saved on open. No permanent mouse changes.
 					local prevIcon = arg._prevMouseIconEnabled
 					if prevIcon ~= nil then
 						tbl46.UIS.MouseIconEnabled = prevIcon
@@ -60282,7 +61534,6 @@ end
 				local wasOrderEdit = arg.OrderEditMode == true
 				arg.OrderEditMode = false
 				arg._orderEditPick = nil
-				-- Never fire module callbacks while reordering the wheel.
 				local flag51 = arg2 == true and v97 ~= nil and not wasOrderEdit
 
 				if wasOrderEdit then
@@ -60367,14 +61618,12 @@ end
 						end
 
 						arg:_resetAllHighlights()
-						-- GUI is fully down now — safe to restore LockCenter if that was prior state.
 						restoreActionWheelMouse(arg, closeToken)
 					end
 				end
 
 				tween.Completed:Connect(fn62)
 				task.delay(0.25, fn62)
-				-- Extra safety after the close animation window.
 				task.delay(0.3, function()
 					if not arg.IsOpen then
 						tbl47.DimOverlay.Modal = false
@@ -60427,7 +61676,6 @@ end
 				if type(actionWheelWheelOrder) ~= "table" or #actionWheelWheelOrder < 2 then
 					return
 				end
-				-- Visible wheel slots (selected modules only) — NOT full order indices.
 				local visibleNames = {}
 				for _, moduleName in ipairs(actionWheelWheelOrder) do
 					if actionWheelSelectedModules[moduleName] then
@@ -60447,7 +61695,6 @@ end
 				end
 				local nameA = visibleNames[selected]
 				local nameB = visibleNames[other]
-				-- Swap those two names inside the full order list.
 				local posA, posB
 				for index, moduleName in ipairs(actionWheelWheelOrder) do
 					if moduleName == nameA then posA = index end
@@ -60463,7 +61710,6 @@ end
 				if rebuildResoActionWheel then
 					pcall(rebuildResoActionWheel)
 				end
-				-- Rebuild keeps GUI open; re-assert edit state and highlight moved module.
 				actionWheel.OrderEditMode = true
 				actionWheel.IsOpen = true
 				if tbl47 and tbl47.ScreenGui then
@@ -60486,7 +61732,6 @@ end
 				if not actionWheel or not actionWheel.IsOpen or not actionWheel.OrderEditMode then
 					return
 				end
-				-- Process even when gameProcessed: modal wheel eats input otherwise.
 				if input.KeyCode == Enum.KeyCode.Escape then
 					actionWheel:Close(false)
 					return
@@ -60544,7 +61789,6 @@ end
 				if actionWheel.IsOpen then
 					if input.UserInputType == Enum.UserInputType.MouseButton1 then
 						if actionWheel.OrderEditMode then
-							-- Reorder mode: clicks only select modules (handled by ItemBtn).
 							return
 						end
 						if actionWheel._selectedIndex then
@@ -60624,8 +61868,6 @@ end
 				fn64(character7)
 			end)
 
-			-- Light touch only: clear frozen position-lock when not RMB-looking, and keep
-			-- the cursor visible in third person when not orbiting. Do not override LockCenter.
 			local thirdPersonMouseStep = "HuiGThirdPersonMouseIconVisible"
 			pcall(function()
 				tbl46.Run:UnbindFromRenderStep(thirdPersonMouseStep)
@@ -60648,22 +61890,6 @@ end
 							tbl46.UIS.MouseBehavior = Enum.MouseBehavior.Default
 						end
 					end)
-				end
-
-				-- Do not force MouseIconEnabled here — inventory / game UI own the cursor.
-				-- Action wheel saves+restores icon on open/close only.
-
-				local thirdPersonOn = false
-				pcall(function()
-					if toggles and toggles.ThirdpersonT and toggles.ThirdpersonT.Value then
-						thirdPersonOn = true
-					elseif options and options.ThirdpersonT and options.ThirdpersonT.Value then
-						thirdPersonOn = true
-					end
-				end)
-				if not thirdPersonOn or menuOpen or commandOpen then return end
-				if not rightMouseHeld then
-					pcall(function() tbl46.UIS.MouseIconEnabled = true end)
 				end
 			end)
 
@@ -60843,7 +62069,6 @@ end
 			if activePrefix ~= "" and input:sub(1, #activePrefix) == activePrefix then input = trim(input:sub(#activePrefix + 1)) end
 			local lowerInput = input:lower()
 			local bestCommand, bestAlias, bestLength
-			-- First prefer a complete command/alias match, including commands followed by arguments.
 			for _, command in ipairs(BuiltinCommands) do
 				for _, alias in ipairs(command.Aliases or { command.Command }) do
 					local lowerAlias = alias:lower()
@@ -60854,8 +62079,6 @@ end
 				end
 			end
 			if bestCommand then return bestCommand, trim(input:sub(bestLength + 1)) end
-			-- Allow Enter on a partial command such as "tsun" to run "tsunami", but only
-			-- when the prefix uniquely identifies one command. Ambiguous prefixes do nothing.
 			if lowerInput == "" or lowerInput:find("%s") then return nil end
 			local partialCommand
 			for _, command in ipairs(BuiltinCommands) do
@@ -61011,8 +62234,6 @@ end
 		local function copyPlayerField(query, field)
 			local target, err = findPlayerByQuery(query)
 			if not target then return false, err end
-			-- Player-target commands wait for a dead target to respawn, except tp/goto.
-			-- Copy actions follow the same command-bar behavior for consistency.
 			if target ~= game:GetService("Players").LocalPlayer and not waitForLiveTargetCharacter(target) then
 				return false, "Target left before respawning."
 			end
@@ -61025,8 +62246,6 @@ end
 		end
 
 		local function runTargetMethod(methodName, query)
-			-- A Player Instance chosen from the suggestion list is always a single-player target,
-			-- even if its display/name happens to resemble a server alias.
 			local lowered = (typeof(query) == "Instance" and query:IsA("Player")) and "" or normalizeLookup(query)
 			local isServer = lowered == "server" or lowered == "all" or lowered == "everyone" or lowered == "allplayers"
 			local methods = { [methodName] = true }
@@ -61038,12 +62257,8 @@ end
 			local localPlayer = game:GetService("Players").LocalPlayer
 			if target == localPlayer then return false, "That target action cannot be run on yourself." end
 			if tbl12.IsProtectedPlayer and tbl12.IsProtectedPlayer(target) then return false, "Reso's player protection blocked that target." end
-			-- Target actions wait asynchronously for a dead player to respawn. Teleport is
-			-- handled separately above and deliberately never waits for target respawn.
 			if not waitForLiveTargetCharacter(target) then return false, "Target left before respawning." end
 
-			-- These two are the normal Reso Apply Method actions, not Loop Apply Method toggles.
-			-- Invoke the exact single-target helper once; do not start a loop or modify global TargetMethods.
 			if methodName == "Kill" then
 				if type(tbl12.Kill) ~= "function" then return false, "Reso's one-shot Kill method is unavailable." end
 				local ok, failure = pcall(tbl12.Kill, target)
@@ -61132,8 +62347,6 @@ end
 			if handler == "tsunami" then
 				local action = tbl7 and tbl7.CommandBarActions and tbl7.CommandBarActions.Tsunami
 				if type(action) ~= "function" then return false, "Tsunami action is unavailable." end
-				-- The Make Tsunami action may yield while its BlackHole operation runs.
-				-- Run it in the background so the command palette can close immediately.
 				task.spawn(function()
 					local ok, failure = pcall(action)
 					if not ok then warn("[Reso Command Bar] Tsunami failed: " .. tostring(failure)) end
@@ -61236,7 +62449,6 @@ end
 			CommandBarState.IsOpen = false
 			CommandBarState.TransitionId += 1
 			local transition = CommandBarState.TransitionId
-			-- Savitar uses a separate close sound at the original volume and speed.
 			playSavitarCommandSound(0.469, 1, soundOverride or "rbxassetid://136521380900455")
 			if dim then dim.Modal = false end
 			pcall(function()
@@ -61333,14 +62545,12 @@ end
 			end
 			if resultsStroke then resultsStroke.Transparency = 1 end
 			if commandBlur and CommandBarState.BlurEnabled then commandBlur.Enabled = true; commandBlur.Size = previousBlurSize or 0 end
-			-- Original Savitar open cue: 124834506603771 at volume 0.469 / speed 1.
 			playSavitarCommandSound(0.469, 1, "rbxassetid://124834506603771")
 			commandSearch.Text = ""
 			commandPlaceholder.Visible = true
 			keyBadgeValue.Text = tostring(CommandBarState.Prefix or ".")
 			setStatus("ENTER  RUN   •   ESC  CLOSE   •   TYPE TO SEARCH")
 			renderCommandResults("")
-			-- Savitar's original 0.32 s cubic expand, glass fade, dim and 22 px blur.
 			if panel then playCommandTween("panel-position", panel, 0.32, { Position = UDim2.new(0.5, 0, 0.14, 0) }, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out); playCommandTween("panel-size", panel, 0.32, { Size = UDim2.fromOffset(884, 72), BackgroundTransparency = 0.28 }, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out) end
 			if glassSheen then playCommandTween("glass-sheen", glassSheen, 0.32, { BackgroundTransparency = 0.88 }, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out) end
 			if panelStroke then playCommandTween("panel-stroke", panelStroke, 0.28, { Transparency = 0.18 }, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out) end
@@ -61376,7 +62586,6 @@ end
 		end
 
 		local function dispatchBuiltinCommand(command, argument, closeSound)
-			-- Close and release focus before any action can yield or error.
 			closePalette(closeSound or "rbxassetid://86827880171546")
 			task.spawn(function()
 				local protectedCall, actionSucceeded, message = pcall(executeBuiltinCommand, command, argument)
@@ -61549,8 +62758,6 @@ end
 		end
 		executeCommand = runCommand
 
-		-- Savitar command-panel visual/audio port. Command execution stays on Reso handlers.
-		-- Main Reso menu animation remains removed; the command palette uses the original short glass transition.
 		commandRoot = Instance.new("ScreenGui")
 		commandRoot.Name = "HuiGCommandPanelGui"
 		commandRoot.DisplayOrder = 1000000
@@ -61885,7 +63092,6 @@ end
 		resultPadding.PaddingBottom = UDim.new(0, 8)
 		resultPadding.Parent = results
 
-		-- Savitar-style two-stage chooser: selected action card on the left, player cards on the right.
 		playerChooserFrame = Instance.new("Frame")
 		playerChooserFrame.Name = "PlayerChooserFrame"
 		playerChooserFrame.Size = UDim2.fromOffset(568, 0)
@@ -62037,7 +63243,7 @@ end
 		commandStatus.TextXAlignment = Enum.TextXAlignment.Left
 		commandStatus.TextTruncate = Enum.TextTruncate.AtEnd
 		commandStatus.ZIndex = 904
-		commandStatus.Visible = false -- Original Savitar result card has no footer status bar.
+		commandStatus.Visible = false
 		commandStatus.Parent = resultsFrame
 
 		addConnection(dim.Activated, function() closePalette() end)
@@ -62138,8 +63344,6 @@ end
 			local query = trim(queryFromInput(rawQuery)):lower()
 			local found = {}
 			local contextCommand, contextRest = matchBuiltinCommand(rawQuery)
-			-- Show player choices immediately after commands like "kick ", "bring ", or "kill ",
-			-- rather than making the user type a partial username before suggestions appear.
 			if contextCommand and contextCommand.RequiresArgument then
 				found = contextualCandidates(contextCommand, contextRest)
 			else
@@ -62304,8 +63508,6 @@ end
 							commandIcon.ImageRectOffset = iconData.ImageRectOffset or Vector2.zero
 							commandIcon.ImageRectSize = iconData.ImageRectSize or Vector2.zero
 						else
-							-- Built-in Lucide names may not be registered as custom icons.
-							-- Fall back to applying the icon by name instead of leaving it blank.
 							lib:ApplyLucideIcon(commandIcon, candidate.Object.Icon)
 						end
 					end)
@@ -62711,8 +63913,6 @@ end
 							CommandBarState.SelectedIndex = index
 							updatePlayerChooserSelection(true)
 							playSavitarCommandSound(0.18, 1.2)
-							-- Close immediately and run in a task. Target respawn waits and other
-							-- slow/erroring actions must never leave the command bar stuck open.
 							local command = CommandBarState.LockedCommand
 							dispatchBuiltinCommand(command, candidate.Object, "rbxassetid://86827880171546")
 						end)
@@ -62994,7 +64194,6 @@ end
 						return
 					end
 				end
-				-- Keep normal typing intact; close using Escape or the outside/close button.
 				if UserInputService:GetFocusedTextBox() then return end
 				local picker = options and options.CommandBarKeybind
 				local keyName = picker and picker.Value or "L"
@@ -63061,7 +64260,6 @@ end
 			table.insert(lib.UnloadSignals, CommandBarState.Cleanup)
 		end
 	end
-	-- ==========================================================
 
 
 	fn18("Script loaded in " .. math.round((tick() - getgenv().LoadTime) * 100) / 100 .. " seconds", "HuiG Custom", 71450094482101)
@@ -63182,25 +64380,43 @@ local run, message = loadstring(sources.Bootstrap, "@Resonance/Bootstrap")
 assert(run, message)
 local result = run(sources)
 
--- No first-person cursor hide (that broke FTAP inventory).
--- Only ensure: when the mouse is unlocked, the system pointer is visible and not a blank icon.
 pcall(function()
     local RunService = game:GetService("RunService")
     local UserInputService = game:GetService("UserInputService")
     RunService:UnbindFromRenderStep("ResoFirstPersonCursor")
     RunService:UnbindFromRenderStep("HuiGThirdPersonMouseIconVisible")
 
+    local env = getgenv and getgenv() or _G
+    local wasNeeded = true
     RunService:BindToRenderStep("ResoFirstPersonCursor", Enum.RenderPriority.Last.Value + 50, function()
-        -- Unlocked = inventory / free mouse. Keep a real visible system cursor.
-        if UserInputService.MouseBehavior == Enum.MouseBehavior.Default then
+        if not env.ResonanceRunning then
+            RunService:UnbindFromRenderStep("ResoFirstPersonCursor")
+            UserInputService.MouseIconEnabled = true
+            return
+        end
+        local lib = env.Library
+        if lib and lib.Toggled then
+            wasNeeded = true
+            return
+        end
+        local playerGui = game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui")
+        local menuGui = playerGui and playerGui:FindFirstChild("MenuGui")
+        local menu = menuGui and menuGui:FindFirstChild("Menu")
+        local unlock = lib and lib.Toggles and lib.Toggles.UnlockMouse
+        local needed = (menu ~= nil and menu.Visible)
+            or (unlock ~= nil and unlock.Value == true)
+            or UserInputService:GetFocusedTextBox() ~= nil
+        if needed then
             if not UserInputService.MouseIconEnabled then
                 UserInputService.MouseIconEnabled = true
             end
-            -- Empty MouseIcon = Roblox default pointer (clears a transparent/custom blank icon).
             if UserInputService.MouseIcon ~= "" then
                 UserInputService.MouseIcon = ""
             end
+        elseif wasNeeded then
+            UserInputService.MouseIconEnabled = false
         end
+        wasNeeded = needed
     end)
 end)
 
